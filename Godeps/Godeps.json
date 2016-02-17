@@ -33,7 +33,7 @@
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "ae71a9cc54fddb61d946abe9191d05a24ac0e21b"
+			"Rev": "88d06c8eecdb5a498ee6165b19d4bc8e394ba273"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-runewidth",
