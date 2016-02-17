@@ -45,11 +45,6 @@
 			"Rev": "4ac6f27528d0a3f2a59e0b0a6f6b3ff0bb89fe20"
 		},
 		{
-			"ImportPath": "github.com/ogier/pflag",
-			"Comment": "v0.0.1-4-g6f7159c",
-			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
-		},
-		{
 			"ImportPath": "github.com/paulrosania/go-charset/charset",
 			"Rev": "621bb39fcc835dce592e682f5073025d0169587b"
 		},
@@ -60,6 +55,10 @@
 		{
 			"ImportPath": "github.com/peterh/liner",
 			"Rev": "3f1c20449d1836aa4cbe38731b96f95cdf89634d"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "7f60f83a2c81bc3c3c0d5297f61ddfa68da9d3b7"
 		},
 		{
 			"ImportPath": "github.com/tarm/goserial",
