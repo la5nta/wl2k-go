@@ -21,7 +21,7 @@ See [Building from source](https://github.com/LA5NTA/wl2k-go/wiki/Building-from-
 #### Features
 * Message composer/reader (basic mailbox functionality).
 * Auto-shrink image attachments (EXPERIMENTAL).
-* Post position reports (uses browser location/GPS in http mode).
+* Post position reports with location from local GPS, browser location or manual entry.
 * Rig control (using hamlib) for winmor PTT and QSY.
 * CRON-like syntax for execution of scheduled commands (e.g. QSY or connect).
 * Built in http-server with web interface (mobile friendly).
