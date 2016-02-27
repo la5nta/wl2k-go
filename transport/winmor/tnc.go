@@ -185,6 +185,7 @@ func (tnc *TNC) runControlLoop() error {
 						tcpConn.Close()
 						selfDisconnect = false
 					}
+					tnc.data = nil
 				}
 			case cmdBusy:
 				tnc.busy = msg.value.(bool)
