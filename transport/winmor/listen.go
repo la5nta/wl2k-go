@@ -116,8 +116,7 @@ func (tnc *TNC) Listen(bandwidth int) (ln net.Listener, err error) {
 						Conn:       dataConn,
 						remoteAddr: Addr{remotecall},
 						localAddr:  Addr{targetcall},
-						ctrlOut:    tnc.out,
-						ctrlIn:     tnc.in,
+						tnc:        tnc,
 					}
 					tnc.connected = true
 
