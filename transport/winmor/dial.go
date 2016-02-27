@@ -14,8 +14,7 @@ import (
 
 type tncConn struct {
 	net.Conn
-	ctrlOut chan<- string
-	ctrlIn  broadcaster
+	tnc *TNC
 
 	remoteAddr Addr
 	localAddr  Addr
@@ -31,10 +30,7 @@ type tncConn struct {
 	nWritten int
 }
 
-func (conn *tncConn) SetRobust(r bool) error {
-	conn.ctrlOut <- fmt.Sprintf("%s %v", cmdRobust, r)
-	return nil // TODO: Should handle error
-}
+func (conn *tncConn) SetRobust(r bool) error { return conn.tnc.SetRobust(r) }
 
 func (conn *tncConn) Write(p []byte) (int, error) {
 	n, err := conn.Conn.Write(p)
@@ -99,8 +95,7 @@ func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {
 		Conn:       dataConn,
 		remoteAddr: Addr{targetcall},
 		localAddr:  Addr{mycall},
-		ctrlOut:    tnc.out,
-		ctrlIn:     tnc.in,
+		tnc:        tnc,
 	}
 
 	// Try to minimize read/write buffer on connection.
@@ -117,14 +112,15 @@ func (conn *tncConn) Close() error {
 
 	conn.flushLock.Unlock() //TODO: Should result in error from Flush(). Or maybe we should call Flush instead here?
 
-	r := conn.ctrlIn.Listen()
+	r := conn.tnc.in.Listen()
 	defer r.Close()
 
-	conn.ctrlOut <- "DISCONNECT"
+	conn.tnc.out <- "DISCONNECT"
 	for msg := range r.Msgs() { // Wait for TNC to disconnect
 		if msg.cmd == cmdDisconnect {
 			// The command echo
 		} else if msg.cmd == cmdNewState && msg.State() == Disconnected {
+			conn.tnc = nil
 			// The control loop have already closed the data connection
 			return nil
 			//return conn.Conn.Close()
