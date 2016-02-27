@@ -120,7 +120,6 @@ func (conn *tncConn) Close() error {
 		if msg.cmd == cmdDisconnect {
 			// The command echo
 		} else if msg.cmd == cmdNewState && msg.State() == Disconnected {
-			conn.tnc = nil
 			// The control loop have already closed the data connection
 			return nil
 			//return conn.Conn.Close()
