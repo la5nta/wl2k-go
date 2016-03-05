@@ -152,6 +152,15 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 		return sent, fmt.Errorf("Unable to parse proposal answer: %s", err)
 	}
 
+	if len(outbound) == 0 {
+		return
+	}
+
+	if r, ok := rw.(transport.Robust); ok && s.robustMode == RobustAuto {
+		r.SetRobust(false)
+		defer r.SetRobust(true)
+	}
+
 	for _, prop := range outbound {
 		switch prop.answer {
 		case Defer:
@@ -375,11 +384,6 @@ func (s *Session) writeCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	}
 
 	buffer := bytes.NewBuffer(p.compressedData[p.offset:])
-
-	if r, ok := rw.(transport.Robust); ok && s.robustMode == RobustAuto {
-		r.SetRobust(false)
-		defer r.SetRobust(true)
-	}
 
 	// Update Status of message transfer every 250ms
 	statusTicker := time.NewTicker(250 * time.Millisecond)
