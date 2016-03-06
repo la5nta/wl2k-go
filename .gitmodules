@@ -1,0 +1,8 @@
+[submodule "transport/ax25/vendor/github.com/tarm/goserial"]
+	path = transport/ax25/vendor/github.com/tarm/goserial
+	url = https://github.com/tarm/goserial.git
+	branch = master
+[submodule "fbb/vendor/github.com/paulrosania/go-charset"]
+	path = fbb/vendor/github.com/paulrosania/go-charset
+	url = https://github.com/paulrosania/go-charset.git
+	branch = master

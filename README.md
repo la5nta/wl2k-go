@@ -1,58 +1,18 @@
 [![Build Status](https://travis-ci.org/la5nta/wl2k-go.svg?branch=master)](https://travis-ci.org/la5nta/wl2k-go)
 
-wl2k-go is a collection of Go packages implementing various parts needed to build a Winlink 2000 client. It includes a Winlink client running on Linux, OS X, other unix-like platforms and Windows.
+### Looking for the cross platform winlink client? Visit [http://getpat.io](http://getpat.io).
 
-The project's goal is to encourage and facilitate development of cross-platform Winlink 2000 clients.
+wl2k-go is a collection of Go packages implementing various parts needed to build a Winlink client.
+
+The project's goal is to encourage and facilitate development of cross-platform Winlink clients.
 
 _This project is under heavy development and breaking API changes are to be expected._
 
-## cmd/wl2k: The client application
+## Pat: The client application
 
-cmd/wl2k is a (experimental) cross-platform Winlink client with basic messaging capabilities.
+On 6 March 2016 the cmd/wl2k application **moved** to it's own [repository](https://github.com/la5nta/pat).
 
-It is the primary sandbox/prototype application for the various wl2k-go sub-packages, and provides both a command line interface and a responsive (mobile-friendly) web interface.
-
-It is mainly developed for Linux, but are also known to run on OS X, Windows and Android.
-
-[Binary releases](https://github.com/la5nta/wl2k-go/releases) are available for Debian and Ubuntu.
-
-See [Building from source](https://github.com/LA5NTA/wl2k-go/wiki/Building-from-source) for build instructions.
-
-#### Features
-* Message composer/reader (basic mailbox functionality).
-* Auto-shrink image attachments (EXPERIMENTAL).
-* Post position reports with location from local GPS, browser location or manual entry.
-* Rig control (using hamlib) for winmor PTT and QSY.
-* CRON-like syntax for execution of scheduled commands (e.g. QSY or connect).
-* Built in http-server with web interface (mobile friendly).
-* Git style command line interface.
-* Listen for P2P connections using multiple modes concurrently.
-* AX.25, telnet, WINMOR and ARDOP support.
-* Experimental gzip message compression (See "Gzip experiment" below).
-
-##### Example
-```
-martinhpedersen@duo:~/wl2k-go$ wl2k interactive
-> listen winmor,telnet-p2p,ax25
-2015/02/03 10:33:10 Listening for incoming traffic (winmor,telnet-p2p,ax25)...
-> connect winmor:LA3F
-2015/02/03 10:34:28 Connecting to winmor:LA3F...
-2015/02/03 10:34:33 Connected to WINMOR:LA3F
-RMS Trimode 1.3.3.0 Follo.SE Oslo. Pactor & Winmor Hybrid Gateway
-LA5NTA has 117 minutes remaining with LA3F
-[WL2K-2.8.4.8-B2FWIHJM$]
-Wien CMS via LA3F >
->FF
-FC EM FOYNU8AKXX59 260 221 0
-F> 68
-1 proposal(s) received
-Accepting FOYNU8AKXX59
-Receiving [//WL2K test til linux] [offset 0]
->FF
-FQ
-Waiting for remote node to close the connection...
-> _
-```
+Check out [getpat.io](http://getpat.io) for the latest version of the cross platform Winlink client, Pat.
 
 ## fbb: The FBB (Winlink 2000 - B2F) protocol implementation
 
