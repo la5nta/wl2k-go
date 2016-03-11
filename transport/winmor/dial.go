@@ -10,6 +10,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/la5nta/wl2k-go/transport"
 )
 
 type tncConn struct {
@@ -73,6 +75,14 @@ func (conn *tncConn) updateBuffers(b []int) {
 	if b[BufferOutConfirmed] >= conn.nWritten && b[BufferOutQueued] == 0 {
 		conn.flushLock.Unlock()
 	}
+}
+
+// DialURL dials winmor:// URLs
+func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
+	if url.Scheme != "winmor" {
+		return nil, transport.ErrUnsupportedScheme
+	}
+	return tnc.Dial(url.Target)
 }
 
 func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {

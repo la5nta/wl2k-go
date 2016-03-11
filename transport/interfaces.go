@@ -1,8 +1,10 @@
-// Copyright 2015 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
+// Copyright 2016 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
 package transport
+
+import "net"
 
 type Flusher interface {
 	// Flush flushes the transmit buffers of the underlying modem.
@@ -27,4 +29,9 @@ type BusyChannelChecker interface {
 
 type PTTController interface {
 	SetPTT(on bool)
+}
+
+// Dialer is implemented by transports that supports dialing a transport.URL.
+type Dialer interface {
+	DialURL(url *URL) (net.Conn, error)
 }

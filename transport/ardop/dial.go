@@ -7,7 +7,18 @@ package ardop
 import (
 	"fmt"
 	"net"
+
+	"github.com/la5nta/wl2k-go/transport"
 )
+
+// DialURL dials ardop:// URLs
+func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
+	if url.Scheme != "ardop" {
+		return nil, transport.ErrUnsupportedScheme
+	}
+
+	return tnc.Dial(url.Target)
+}
 
 func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {
 	if tnc.closed {

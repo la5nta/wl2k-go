@@ -11,6 +11,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/la5nta/wl2k-go/transport"
 )
 
 const (
@@ -18,6 +20,12 @@ const (
 	CMSPassword   = "CMSTelnet"
 	CMSAddress    = "server.winlink.org:8772"
 )
+
+var DefaultDialer = &Dialer{Timeout: 10 * time.Second}
+
+func init() {
+	transport.RegisterDialer("telnet", DefaultDialer)
+}
 
 // DialCMS dials a random CMS server through server.winlink.org.
 //
@@ -37,8 +45,30 @@ func DialCMS(mycall string) (net.Conn, error) {
 	return conn, err
 }
 
+// Dialer implements the transport.Dialer interface.
+type Dialer struct{ Timeout time.Duration }
+
+// DialURL dials telnet:// URLs
+func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
+	if url.Scheme != "telnet" {
+		return nil, transport.ErrUnsupportedScheme
+	}
+
+	var user, pass string
+	if url.User != nil {
+		pass, _ = url.User.Password()
+		user = url.User.Username()
+	}
+
+	return DialTimeout(url.Host, user, pass, d.Timeout)
+}
+
 func Dial(addr, mycall, password string) (net.Conn, error) {
-	conn, err := net.DialTimeout(`tcp`, addr, 5*time.Second)
+	return DialTimeout(addr, mycall, password, 5*time.Second)
+}
+
+func DialTimeout(addr, mycall, password string, timeout time.Duration) (net.Conn, error) {
+	conn, err := net.DialTimeout(`tcp`, addr, timeout)
 	if err != nil {
 		return nil, err
 	}

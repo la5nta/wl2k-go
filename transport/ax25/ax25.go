@@ -15,9 +15,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/la5nta/wl2k-go/transport"
 )
 
 const _NETWORK = "AX.25"
+
+var DefaultDialer = &Dialer{Timeout: 45 * time.Second}
+
+func init() {
+	transport.RegisterDialer("ax25", DefaultDialer)
+	transport.RegisterDialer("serial-tnc", DefaultDialer)
+}
 
 type addr interface {
 	Address() Address // Callsign
@@ -88,6 +97,39 @@ type Beacon interface {
 	RemoteAddr() net.Addr
 
 	Message() string
+}
+
+type Dialer struct {
+	Timeout time.Duration
+}
+
+func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
+	target := url.Target
+	if len(url.Digis) > 0 {
+		target = fmt.Sprintf("%s via %s", target, strings.Join(url.Digis, " "))
+	}
+
+	switch url.Scheme {
+	case "ax25":
+		return DialAX25Timeout(url.Host, url.User.Username(), url.Target, d.Timeout)
+	case "serial-tnc":
+		//TODO: This is some badly designed legacy stuff. Need to re-think the whole
+		//serial-tnc scheme. See issue #34.
+		baudrate := Baudrate(1200)
+		if i, _ := strconv.Atoi(url.Params.Get("hbaud")); i > 0 {
+			baudrate = Baudrate(i)
+		}
+
+		return DialKenwood(
+			url.Host,
+			url.User.Username(),
+			url.Target,
+			NewConfig(baudrate),
+			nil,
+		)
+	default:
+		return nil, transport.ErrUnsupportedScheme
+	}
 }
 
 func AddressFromString(str string) Address {
