@@ -331,7 +331,7 @@ func (m *Message) IsOnlyReceiver(addr Address) bool {
 	if len(receivers) != 1 {
 		return false
 	}
-	return receivers[0].String() == addr.String()
+	return strings.EqualFold(receivers[0].String(), addr.String())
 }
 
 // Method for generating a proposal of the message.
