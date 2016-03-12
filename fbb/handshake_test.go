@@ -14,6 +14,7 @@ func TestParseFW(t *testing.T) {
 		";FW: LA5NTA":       []Address{AddressFromString("LA5NTA")},
 		";FW: LE1OF":        []Address{AddressFromString("LE1OF")},
 		";FW: LE1OF LA5NTA": []Address{AddressFromString("LE1OF"), AddressFromString("LA5NTA")},
+		";FW: la4tta":       []Address{{Addr: "LA4TTA"}},
 	}
 
 	for input, expected := range tests {

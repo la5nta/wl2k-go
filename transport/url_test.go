@@ -13,6 +13,7 @@ import (
 func TestParseURL(t *testing.T) {
 	tests := map[string]URL{
 		"ax25:///LA5NTA":                       {Scheme: "ax25", Target: "LA5NTA", Digis: []string{}, Params: url.Values{}},
+		"ax25:///la5nta":                       {Scheme: "ax25", Target: "LA5NTA", Digis: []string{}, Params: url.Values{}},
 		"ax25:///LA1B-10/LA5NTA":               {Scheme: "ax25", Target: "LA5NTA", Digis: []string{"LA1B-10"}, Params: url.Values{}},
 		"ax25://axport/LA5NTA":                 {Scheme: "ax25", Host: "axport", Target: "LA5NTA", Digis: []string{}, Params: url.Values{}},
 		"ax25://0/LA5NTA":                      {Scheme: "ax25", Host: "0", Target: "LA5NTA", Digis: []string{}, Params: url.Values{}},
@@ -21,7 +22,7 @@ func TestParseURL(t *testing.T) {
 		"telnet://LA5NTA:CMSTelnet@server.winlink.org:8772/wl2k": {
 			Scheme: "telnet",
 			Host:   "server.winlink.org:8772",
-			Target: "wl2k",
+			Target: "WL2K",
 			User:   url.UserPassword("LA5NTA", "CMSTelnet"),
 			Digis:  []string{},
 			Params: url.Values{},

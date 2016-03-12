@@ -46,6 +46,9 @@ func ParseURL(rawurl string) (*URL, error) {
 		return nil, err
 	}
 
+	// The digis and target should be all upper case
+	u.Path = strings.ToUpper(u.Path)
+
 	via, target := path.Split(u.Path)
 	if len(target) < 3 {
 		return nil, ErrInvalidTarget
