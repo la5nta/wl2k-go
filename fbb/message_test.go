@@ -5,6 +5,7 @@
 package fbb
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -24,6 +25,25 @@ func TestParseDate(t *testing.T) {
 		got, _ := ParseDate(str)
 		if !got.Equal(expect) {
 			t.Errorf("Unexpected Time when parsing `%s`: %s", str, got)
+		}
+	}
+}
+
+func TestAddressFromString(t *testing.T) {
+	tests := map[string]Address{
+		"LA5NTA":             {Proto: "", Addr: "LA5NTA"},
+		"la5nta":             {Proto: "", Addr: "LA5NTA"},
+		"LA5NTA@winlink.org": {Proto: "", Addr: "LA5NTA"},
+		"LA5NTA@WINLINK.org": {Proto: "", Addr: "LA5NTA"},
+		"la5nta@WINLINK.org": {Proto: "", Addr: "LA5NTA"},
+
+		"foo@bar.baz": {Proto: "SMTP", Addr: "foo@bar.baz"},
+	}
+
+	for str, expect := range tests {
+		got := AddressFromString(str)
+		if !reflect.DeepEqual(expect, got) {
+			t.Errorf("'%s' got %#v expected %#v", str, got, expect)
 		}
 	}
 }

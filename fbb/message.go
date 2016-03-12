@@ -483,16 +483,23 @@ func (a Address) EqualString(b string) bool { return a == AddressFromString(b) }
 //
 // Supported formats: foo@bar.baz (SMTP proto), N0CALL (short winlink address) or N0CALL@winlink.org (full winlink address).
 func AddressFromString(addr string) Address {
+	var a Address
+
 	if parts := strings.Split(addr, ":"); len(parts) == 2 {
-		return Address{Proto: parts[0], Addr: parts[1]}
-	}
-	if parts := strings.Split(addr, "@"); len(parts) == 1 {
-		return Address{Addr: addr}
+		a = Address{Proto: parts[0], Addr: parts[1]}
+	} else if parts := strings.Split(addr, "@"); len(parts) == 1 {
+		a = Address{Addr: addr}
 	} else if strings.EqualFold(parts[1], "winlink.org") {
-		return Address{Addr: parts[0]}
+		a = Address{Addr: parts[0]}
 	} else {
-		return Address{Proto: "SMTP", Addr: addr}
+		a = Address{Proto: "SMTP", Addr: addr}
 	}
+
+	if a.Proto == "" {
+		a.Addr = strings.ToUpper(a.Addr)
+	}
+
+	return a
 }
 
 func ParseDate(dateStr string) (time.Time, error) {

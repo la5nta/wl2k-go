@@ -135,7 +135,11 @@ var StdUA = UserAgent{Name: "wl2kgo", Version: "0.1a"}
 // Constructs a new Session object.
 //
 // The Handler can be nil (but no messages will be exchanged).
+//
+// Mycall and targetcall will be upper-cased.
 func NewSession(mycall, targetcall, locator string, h MBoxHandler) *Session {
+	mycall, targetcall = strings.ToUpper(mycall), strings.ToUpper(targetcall)
+
 	return &Session{
 		mycall:     mycall,
 		localFW:    []Address{AddressFromString(mycall)},
