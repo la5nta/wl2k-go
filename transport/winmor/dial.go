@@ -7,6 +7,7 @@ package winmor
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -120,19 +121,28 @@ func (conn *tncConn) Close() error {
 		return nil
 	}
 
-	conn.flushLock.Unlock() //TODO: Should result in error from Flush(). Or maybe we should call Flush instead here?
+	conn.Flush() // TODO: Timeout and return error here?
 
 	r := conn.tnc.in.Listen()
 	defer r.Close()
 
-	conn.tnc.out <- "DISCONNECT"
-	for msg := range r.Msgs() { // Wait for TNC to disconnect
-		if msg.cmd == cmdDisconnect {
-			// The command echo
-		} else if msg.cmd == cmdNewState && msg.State() == Disconnected {
-			// The control loop have already closed the data connection
-			return nil
-			//return conn.Conn.Close()
+	conn.tnc.out <- fmt.Sprint(cmdDisconnect)
+	for { // Wait for TNC to disconnect
+		select {
+		case msg := <-r.Msgs():
+			if msg.cmd == cmdDisconnect {
+				// The command echo
+			} else if msg.cmd == cmdNewState && msg.State() == Disconnected {
+				// The control loop have already closed the data connection
+				return nil
+				//return conn.Conn.Close()
+			}
+		case <-time.After(2 * time.Minute): // Sensible timeout
+			// Timeout
+			if debugEnabled() {
+				log.Printf("conn.Close(): timeout while waiting for newstate. Sending %s", cmdDirtyDisconnect)
+			}
+			conn.tnc.out <- fmt.Sprint(cmdDirtyDisconnect)
 		}
 	}
 	return errors.New("TNC hung up while waiting for requested disconnect")
