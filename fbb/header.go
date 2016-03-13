@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/textproto"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/paulrosania/go-charset/charset"
 	_ "github.com/paulrosania/go-charset/data"
@@ -135,14 +136,21 @@ func (d *WordDecoder) DecodeHeader(header string) (string, error) {
 		return d.WordDecoder.DecodeHeader(header)
 	}
 
-	// If there is no encoded-word, decode as ISO-8859-1 (RMS Express compatibility hack)
+	// If there is no encoded-word, the data may be ISO-8859-1 or UTF-8 depending on how CMS decoded it.
+	//
+	// It turns out that if CMS receives a Q-encoded subject it decodes it and forwards it as UTF-8.
+	// If CMS on the other hand receives an SMTP email from gmail, it is enocded as ISO-8859-1.
+	if utf8.Valid([]byte(header)) {
+		return header, nil
+	}
+
 	r, err := charset.NewReader(DefaultCharset, bytes.NewReader([]byte(header)))
 	if err != nil {
 		return header, err
 	}
 
-	utf8, err := ioutil.ReadAll(r)
-	return string(utf8), err
+	decoded, _ := ioutil.ReadAll(r)
+	return string(decoded), nil
 }
 
 func toCharset(set, s string) (string, error) {
