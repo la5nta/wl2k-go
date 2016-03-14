@@ -53,17 +53,6 @@ const (
 
 func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 	var sent map[string]bool
-	defer func() {
-		if err != nil {
-			return
-		}
-		for mid, rej := range sent {
-			s.h.SetSent(mid, rej)
-			if !rej {
-				s.trafficStats.Sent = append(s.trafficStats.Sent, mid)
-			}
-		}
-	}()
 
 	// Send outbound messages
 	if len(s.outbound()) > 0 {
@@ -73,22 +62,31 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 		}
 	}
 
-	sessionTurnOverImplied := len(sent) > 0
+	// Report rejected now, they can safely be omitted even if an error occures
+	for mid, rej := range sent {
+		if rej {
+			s.h.SetSent(mid, rej)
+			delete(sent, mid)
+		}
+	}
+
+	// If all messages was deferred/rejected, we should propose new messages
+	if len(sent) == 0 && len(s.outbound()) > 0 {
+		return s.handleOutbound(rw)
+	}
+
+	// Handle session turnover
 	switch {
-	case sessionTurnOverImplied:
-	case len(s.outbound()) > 0:
-		return s.handleOutbound(rw) //REVIEW: Is it safe to continue sending outbound proposals when all previous was deferred/rejected?
+	case len(sent) > 0:
+		// Turnover is emplied
 	case s.remoteNoMsgs && len(sent) == 0:
 		s.pLog.Print(">FQ")
 		fmt.Fprint(rw, "FQ\r")
 		quitSent = true
+		return // No need to check for remote error since we did not send any messages
 	default:
 		s.pLog.Print(">FF")
 		fmt.Fprint(rw, "FF\r")
-	}
-
-	if quitSent == true {
-		return
 	}
 
 	// Error reporting from remote is not defined by the protocol,
@@ -106,6 +104,14 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 			return
 		}
 		err = fmt.Errorf("Unexpected response: '%s'", line)
+		return
+	}
+
+	for mid, rej := range sent {
+		s.h.SetSent(mid, rej)
+		if !rej {
+			s.trafficStats.Sent = append(s.trafficStats.Sent, mid)
+		}
 	}
 
 	return
@@ -243,6 +249,9 @@ Loop:
 			if nAccepted > 0 {
 				break Loop // Session turn over is implied after receiving the messages
 			}
+
+			// Continue receiving proposals if all where rejected/deferred
+			return s.handleInbound(rw)
 		default: //TODO: Ignore?
 			return false, fmt.Errorf("Unknown protocol command %c", line[1])
 		}
