@@ -407,17 +407,21 @@ func (s *Session) writeCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 					transferred = 0
 				}
 
-				s.statusUpdater.UpdateStatus(Status{
-					Sending:          p,
-					BytesTransferred: transferred,
-					BytesTotal:       p.compressedSize,
-				})
+				if s.statusUpdater != nil {
+					s.statusUpdater.UpdateStatus(Status{
+						Sending:          p,
+						BytesTransferred: transferred,
+						BytesTotal:       p.compressedSize,
+					})
+				}
 			case <-statusDone:
-				s.statusUpdater.UpdateStatus(Status{
-					Sending:          p,
-					BytesTransferred: p.compressedSize - buffer.Len(),
-					BytesTotal:       p.compressedSize,
-				})
+				if s.statusUpdater != nil {
+					s.statusUpdater.UpdateStatus(Status{
+						Sending:          p,
+						BytesTransferred: p.compressedSize - buffer.Len(),
+						BytesTotal:       p.compressedSize,
+					})
+				}
 				return
 			}
 		}
