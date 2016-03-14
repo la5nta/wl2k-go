@@ -1,4 +1,4 @@
-// Copyright 2015 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
+// Copyright 2016 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -362,7 +363,22 @@ func (s *Session) outbound() []*Proposal {
 
 		props = append(props, prop)
 	}
+
+	// Sort the proposals by size, smallest first as suggested by the Winlink FAQ Q460.
+	sort.Sort(bySize(props))
+
 	return props
+}
+
+type bySize []*Proposal
+
+func (s bySize) Len() int      { return len(s) }
+func (s bySize) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s bySize) Less(i, j int) bool {
+	if s[i].compressedSize != s[j].compressedSize {
+		return s[i].compressedSize < s[j].compressedSize
+	}
+	return s[i].MID() < s[j].MID()
 }
 
 func (s *Session) highestPropCode() PropCode {
