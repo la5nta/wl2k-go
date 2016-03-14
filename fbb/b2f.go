@@ -317,7 +317,7 @@ func parseProposalAnswer(str string, props []*Proposal, l *log.Logger) error {
 		c, str = str[0], str[1:]
 
 		switch c {
-		case 'Y', 'y', 'H', 'h', '+':
+		case 'Y', 'y', '+':
 			if l != nil {
 				l.Printf("Remote accepted %s", prop.MID())
 			}
@@ -327,7 +327,7 @@ func parseProposalAnswer(str string, props []*Proposal, l *log.Logger) error {
 				l.Printf("Remote already received %s", prop.MID())
 			}
 			prop.answer = Reject
-		case 'L', 'l', '=':
+		case 'L', 'l', '=', 'H', 'h':
 			if l != nil {
 				l.Printf("Remote defered %s", prop.MID())
 			}
