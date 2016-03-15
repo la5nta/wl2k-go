@@ -16,7 +16,7 @@ func TestParseProposalAnswer(t *testing.T) {
 				offset: 3350,
 			}, // A3350
 			&Proposal{answer: Reject}, // R
-			&Proposal{answer: Accept}, // H
+			&Proposal{answer: Defer},  // H
 		},
 		"FS +=!3350-+": []*Proposal{
 			&Proposal{answer: Accept}, // +

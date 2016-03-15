@@ -1,3 +1,7 @@
+// Copyright 2016 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
+// Use of this source code is governed by the MIT-license that can be
+// found in the LICENSE file.
+
 package fbb
 
 import (
@@ -8,6 +12,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/textproto"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -106,19 +111,24 @@ func (h Header) Write(w io.Writer) error {
 		return err
 	}
 
-	for k, slice := range h {
-		if strings.EqualFold(k, HEADER_MID) {
-			continue
+	// The rest should be printed in a stable order to ensure reproducibility
+	keys := make([]string, 0, len(h))
+	for k, _ := range h {
+		if !strings.EqualFold(k, HEADER_MID) {
+			keys = append(keys, k)
 		}
-
-		for _, v := range slice {
+	}
+	sort.Sort(sort.StringSlice(keys))
+	for _, key := range keys {
+		for _, v := range h[key] {
 			v = textproto.TrimString(v)
-			_, err = fmt.Fprintf(w, "%s: %s\r\n", k, v)
+			_, err = fmt.Fprintf(w, "%s: %s\r\n", key, v)
 			if err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
