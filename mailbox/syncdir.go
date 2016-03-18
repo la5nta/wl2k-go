@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/la5nta/wl2k-go/fbb"
 )
@@ -22,6 +24,8 @@ const (
 	DIR_SENT    = "/sent/"
 	DIR_ARCHIVE = "/archive/"
 )
+
+const Ext = ".b2f"
 
 // NewDirHandler is a file system (directory) oriented mailbox handler.
 type DirHandler struct {
@@ -73,7 +77,7 @@ func (h *DirHandler) AddOut(msg *fbb.Message) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path.Join(h.MBoxPath, DIR_OUTBOX, msg.MID()), data, 0644)
+	return ioutil.WriteFile(path.Join(h.MBoxPath, DIR_OUTBOX, msg.MID()+Ext), data, 0644)
 }
 
 func (h *DirHandler) ProcessInbound(msgs ...*fbb.Message) (err error) {
@@ -101,7 +105,7 @@ func (h *DirHandler) GetInboundAnswer(p fbb.Proposal) fbb.ProposalAnswer {
 	}
 
 	// Check if file exists
-	f, err := os.Open(path.Join(h.MBoxPath, DIR_INBOX, p.MID()))
+	f, err := os.Open(path.Join(h.MBoxPath, DIR_INBOX, p.MID()+Ext))
 	if err == nil {
 		f.Close()
 		return fbb.Reject
@@ -115,8 +119,8 @@ func (h *DirHandler) GetInboundAnswer(p fbb.Proposal) fbb.ProposalAnswer {
 }
 
 func (h *DirHandler) SetSent(MID string, rejected bool) {
-	oldPath := path.Join(h.MBoxPath, DIR_OUTBOX, MID)
-	newPath := path.Join(h.MBoxPath, DIR_SENT, MID)
+	oldPath := path.Join(h.MBoxPath, DIR_OUTBOX, MID+Ext)
+	newPath := path.Join(h.MBoxPath, DIR_SENT, MID+Ext)
 
 	if err := os.Rename(oldPath, newPath); err != nil {
 		log.Fatalf("Unable to move %s to %s: %s", oldPath, newPath, err)
@@ -221,6 +225,20 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 			continue
 		}
 
+		// Migrate to .b2f extension if we find a file that matches the old filenames.
+		//
+		// This should be removed after some time.
+		if isOldFilename(file.Name()) {
+			if err := migrateDir(dirPath); err != nil {
+				return nil, fmt.Errorf("Unable to migrate to new filenames: %s")
+			}
+			return LoadMessageDir(dirPath)
+		}
+
+		if !strings.EqualFold(filepath.Ext(file.Name()), Ext) {
+			continue
+		}
+
 		msg, err := OpenMessage(path.Join(dirPath, file.Name()))
 		if err != nil {
 			return nil, err
@@ -229,6 +247,37 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 		msgs = append(msgs, msg)
 	}
 	return msgs, nil
+}
+
+func isOldFilename(str string) bool {
+	if len(str) > fbb.MaxMIDLength || filepath.Ext(str) != "" || strings.ContainsAny(str, "#~.") {
+		return false
+	}
+	return true
+}
+
+func migrateDir(dirPath string) error {
+	files, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() || !isOldFilename(file.Name()) {
+			continue
+		}
+
+		err := os.Rename(
+			path.Join(dirPath, file.Name()),
+			path.Join(dirPath, file.Name()+Ext),
+		)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // OpenMessage opens a single a fbb.Message file.
