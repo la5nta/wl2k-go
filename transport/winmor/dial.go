@@ -129,13 +129,16 @@ func (conn *tncConn) Close() error {
 	conn.tnc.out <- fmt.Sprint(cmdDisconnect)
 	for { // Wait for TNC to disconnect
 		select {
-		case msg := <-r.Msgs():
+		case msg, ok := <-r.Msgs():
+			if !ok {
+				return errors.New("TNC hung up while waiting for requested disconnect")
+			}
+
 			if msg.cmd == cmdDisconnect {
 				// The command echo
 			} else if msg.cmd == cmdNewState && msg.State() == Disconnected {
 				// The control loop have already closed the data connection
 				return nil
-				//return conn.Conn.Close()
 			}
 		case <-time.After(15 * time.Second): // Sensible timeout
 			// Timeout
@@ -143,9 +146,10 @@ func (conn *tncConn) Close() error {
 				log.Printf("conn.Close(): timeout while waiting for newstate. Sending %s", cmdDirtyDisconnect)
 			}
 			conn.tnc.out <- fmt.Sprint(cmdDirtyDisconnect)
+			return nil
 		}
 	}
-	return errors.New("TNC hung up while waiting for requested disconnect")
+	panic("Impossible")
 }
 
 func (conn *tncConn) RemoteAddr() net.Addr {
