@@ -181,6 +181,7 @@ func (tnc *TNC) runControlLoop() error {
 					if tcpConn := tnc.data.Conn.(*net.TCPConn); !selfDisconnect {
 						tcpConn.CloseRead()
 						tcpConn.CloseWrite()
+						tnc.data.flushLock.Unlock()
 					} else {
 						tcpConn.Close()
 						selfDisconnect = false
