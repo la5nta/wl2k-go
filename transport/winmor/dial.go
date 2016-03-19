@@ -137,7 +137,7 @@ func (conn *tncConn) Close() error {
 				return nil
 				//return conn.Conn.Close()
 			}
-		case <-time.After(2 * time.Minute): // Sensible timeout
+		case <-time.After(15 * time.Second): // Sensible timeout
 			// Timeout
 			if debugEnabled() {
 				log.Printf("conn.Close(): timeout while waiting for newstate. Sending %s", cmdDirtyDisconnect)
