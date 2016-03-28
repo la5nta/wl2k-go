@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"strconv"
 	"strings"
 	"time"
@@ -369,17 +370,20 @@ func parseProposalAnswer(str string, props []*Proposal, l *log.Logger) error {
 }
 
 func (s *Session) writeCompressed(rw io.ReadWriter, p *Proposal) (err error) {
-	var checksum int64
-
-	writer := bufio.NewWriter(rw)
-
-	title, offset := p.title, fmt.Sprintf("%d", p.offset)
-	length := len(title) + len(offset) + 2
-	s.log.Printf("Transmitting [%s] [offset %s]", title, offset)
+	s.log.Printf("Transmitting [%s] [offset %d]", p.title, p.offset)
 
 	if p.code == GzipProposal {
 		s.log.Println("GZIP_EXPERIMENT:", "Transmitting gzip compressed message.")
 	}
+
+	writer := bufio.NewWriter(rw)
+
+	var (
+		title    = mime.QEncoding.Encode("utf-8", p.title) // Word-encode the title since this field must be ASCII-only
+		offset   = fmt.Sprintf("%d", p.offset)
+		length   = len(title) + len(offset) + 2
+		checksum int64
+	)
 
 	writer.Write([]byte{_CHRSOH, byte(length)})
 	writer.WriteString(title) // Max 80 bytes, min 1 byte
@@ -502,11 +506,16 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	}
 	headerLength := int(c)
 
-	if p.title, err = s.rd.ReadString(_CHRNUL); err != nil {
+	// Read proposal title.
+	title, err := s.rd.ReadString(_CHRNUL)
+	if err != nil {
 		return errors.New(`Unable to parse title: ` + err.Error())
-	} else {
-		p.title = p.title[:len(p.title)-1]
 	}
+	title = title[:len(title)-1] // Remove _CHRNUL
+
+	// The proposal title should be ASCII-only according to the protocol specification. Since RMS Express and CMS puts
+	// the raw subject header here, we need to handle this by decoding it the same way as the subject header.
+	p.title, _ = new(WordDecoder).DecodeHeader(title)
 
 	var offset string
 	if offset, err = s.rd.ReadString(_CHRNUL); err != nil {
@@ -515,7 +524,7 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 		offset = offset[:len(offset)-1]
 	}
 
-	actualHeaderLength := (len(p.title) + len(offset)) + 2
+	actualHeaderLength := (len(title) + len(offset)) + 2
 	if headerLength != actualHeaderLength {
 		return errors.New(fmt.Sprintf(`Header length mismatch: expected %d, got %d`, headerLength, actualHeaderLength))
 	}
