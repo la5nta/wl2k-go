@@ -8,4 +8,84 @@ project after a request by Martin Hebnes Pedersen 2015/10/30.
 Be aware that these files have not been released under any particular license. Although Maiko has
 kindly allowed me to copy this code, he does not hold copyright of all the work in these files.
 
+For more information on the license of the original code, see email from Russel Marks below.
+
 Martin Hebnes Pedersen 2015/10/30
+
+------------------------------------------------------
+
+Email from Russel Marks on lzhuf.c licensing:
+(from https://groups.google.com/forum/#!topic/comp.compression/u-YZjDzdF3A)
+
+Path: archiver1.google.com!newsfeed.google.com!newsfeed.stanford.edu!news-spur1.maxwell.syr.edu!news.maxwell.syr.edu!btnet-peer1!btnet-peer0!btnet!news5-gui.server.ntli.net!ntli.net!news6-win.server.ntlworld.com.POSTED!not-for-mail
+Newsgroups: comp.compression
+Subject: lzhuf.c licence update
+From: Russell Marks <russell.marks@spam^H^H^H^Hntlworld.com>
+Lines: 55
+User-Agent: Gnus/5.0807 (Gnus v5.8.7) Emacs/20.7
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Message-ID: <Ccse7.1311$tG2.106880@news6-win.server.ntlworld.com>
+Date: 15 Aug 2001 11:31:54 +0100
+NNTP-Posting-Host: 62.252.9.134
+X-Complaints-To: ab...@ntlworld.com
+X-Trace: news6-win.server.ntlworld.com 997871522 62.252.9.134 (Wed, 15 Aug 2001 11:32:02 BST)
+NNTP-Posting-Date: Wed, 15 Aug 2001 11:32:02 BST
+Organization: ntlworld News Service
+Xref: archiver1.google.com comp.compression:6683
+
+Recently I posted asking about the authors/licence of `lzhuf.c'. I've
+contacted most of the authors since, so I thought I'd post the
+results. My main question to them was whether I could use lzhuf.c in a
+GPL'd program, but I did also try to clear up the original licence for
+those who might want to use it in BSD-licenced programs, or whatever. [1]
+
+Kenji Rikitake said, "my contribution to lzhuf.c is very little and I
+will not claim any objection for the usage".
+
+Haruhiko Okumura (or should I say, Professor Okumura :-)) said,
+initially referring to the "Permission granted for non-commercial use"
+comment that Kenji asked to be added in 1989, "I was unaware that
+Kenji had added that phrase. I (and as far as I know, Yoshi) have
+never been that strict; LHarc and LHA have been included in many
+commercial software packages. There should be no problem if you take
+LZHUF.C as ether GPL'd or LGPL'd."
+
+When I asked what licence I should say lzhuf.c was under, suggesting
+his old terms for (among others) lzari.c which are "Use, distribute,
+and modify this program freely", he agreed.
+
+Haruyasu Yoshizaki (Yoshi) has proven difficult to contact. I've
+emailed him at an address Prof. Okumura suggested might be worth
+trying, but from what I've read on the web about how busy he's said to
+be (and how he doesn't really want email, which explains why an email
+address for him was difficult to come by), I don't expect a reply.
+
+So, since lzhuf.c is significantly based on Okumura's lzari.c [2]
+(which has always had the above licence), I'm going to go with his
+opinion on the matter, and assume that Yoshi would not object. (Not
+least because Prof. Okumura said `I can assure you that his intention
+has always been "try it, and improve it."')
+
+In summary:
+
+The authors I've been able to contact agree to the licence "Use,
+distribute, and modify this program freely" - "freely" here meaning
+`without restriction', and not being a reference to price. The
+remaining author I've not been able to contact, but the licence
+appears consistent with his intent, and was also the licence on the
+original program which he modified (lzari.c).
+
+-Rus.
+
+[1] But note that LZH compression is unfortunately patented (US patent
+no. 4,906,991 covers it) - decompression isn't, so I don't expect this
+to affect my program. And unless you have a specific need for LZH like
+I did, something like zlib would generally be a better choice anyway.
+
+[2] The version of lzhuf.c referred to by the `author' of the CP/M
+port made this rather clearer:
+
+ * LZSS coded by Haruhiko OKUMURA
+ * Adaptive Huffman Coding coded by Haruyasu YOSHIZAKI
+ * Edited and translated to English by Kenji RIKITAKE
