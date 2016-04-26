@@ -111,7 +111,7 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 
 	switch url.Scheme {
 	case "ax25":
-		return DialAX25Timeout(url.Host, url.User.Username(), url.Target, d.Timeout)
+		return DialAX25Timeout(url.Host, url.User.Username(), target, d.Timeout)
 	case "serial-tnc":
 		//TODO: This is some badly designed legacy stuff. Need to re-think the whole
 		//serial-tnc scheme. See issue #34.
@@ -123,7 +123,7 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 		return DialKenwood(
 			url.Host,
 			url.User.Username(),
-			url.Target,
+			target,
 			NewConfig(baudrate),
 			nil,
 		)
