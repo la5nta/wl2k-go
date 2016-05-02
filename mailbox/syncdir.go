@@ -83,7 +83,7 @@ func (h *DirHandler) AddOut(msg *fbb.Message) error {
 func (h *DirHandler) ProcessInbound(msgs ...*fbb.Message) (err error) {
 	dir := path.Join(h.MBoxPath, DIR_INBOX)
 	for _, m := range msgs {
-		filename := path.Join(dir, m.MID())
+		filename := path.Join(dir, m.MID()+Ext)
 
 		m.Header.Set("X-Unread", "true")
 
