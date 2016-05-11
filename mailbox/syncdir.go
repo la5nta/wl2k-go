@@ -93,7 +93,7 @@ func (h *DirHandler) ProcessInbound(msgs ...*fbb.Message) (err error) {
 		}
 
 		if err = ioutil.WriteFile(filename, data, 0664); err != nil {
-			err = fmt.Errorf("Unable to write received message (%s): %s", filename, err)
+			return fmt.Errorf("Unable to write received message (%s): %s", filename, err)
 		}
 	}
 	return
@@ -230,7 +230,7 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 		// This should be removed after some time.
 		if isOldFilename(file.Name()) {
 			if err := migrateDir(dirPath); err != nil {
-				return nil, fmt.Errorf("Unable to migrate to new filenames: %s")
+				return nil, fmt.Errorf("Unable to migrate to new filenames: %s", err)
 			}
 			return LoadMessageDir(dirPath)
 		}
