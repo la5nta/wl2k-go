@@ -1,6 +1,9 @@
 [![Build Status](https://travis-ci.org/la5nta/wl2k-go.svg?branch=master)](https://travis-ci.org/la5nta/wl2k-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/la5nta/wl2k-go)](https://goreportcard.com/report/github.com/la5nta/wl2k-go)
 
 ### Looking for the cross platform winlink client? Visit [http://getpat.io](http://getpat.io).
+
+## Overview
 
 wl2k-go is a collection of Go packages implementing various parts needed to build a Winlink client.
 
