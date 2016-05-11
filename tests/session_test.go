@@ -106,7 +106,7 @@ func TestMultiBlockAllDeferred(t *testing.T) {
 	select {
 	case err, ok := <-errors:
 		if !ok {
-			break // No error occured
+			break // No error occurred
 		}
 		t.Fatalf("Exchange failed at listening node: %s", err)
 	case <-time.After(time.Minute):

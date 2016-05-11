@@ -210,7 +210,7 @@ func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 	}
 
 	// The given conn should always be closed after returning from this method.
-	// If an error occured, echo it to the remote.
+	// If an error occurred, echo it to the remote.
 	defer func() {
 		if err == nil {
 			return

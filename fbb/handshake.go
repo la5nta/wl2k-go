@@ -171,7 +171,7 @@ const (
 	sFBComp0    = "B"  // FBB compressed protocol v0 supported
 	sFBComp1    = "B1" // FBB compressed protocol v1 supported
 	sFBComp2    = "B2" // FBB compressed protocol v2 (aka B2F) supported
-	sHL         = "H"  // Hierachical Location designators supported
+	sHL         = "H"  // Hierarchical Location designators supported
 	sMID        = "M"  // Message identifier supported
 	sCompBatchF = "X"  // Compressed batch forwarding supported
 	sI          = "I"  // "Identify"? Palink-unix sends ";target de mycall QTC n" when remote has this
