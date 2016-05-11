@@ -68,7 +68,7 @@ func ParseURL(rawurl string) (*URL, error) {
 
 	// Digis
 	url.Digis = strings.Split(strings.Trim(via, "/"), "/")
-	sort.Reverse(sort.StringSlice(url.Digis))
+	_ = sort.Reverse(sort.StringSlice(url.Digis))
 	if len(url.Digis) == 1 && url.Digis[0] == "" {
 		url.Digis = []string{}
 	}
