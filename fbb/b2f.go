@@ -294,8 +294,15 @@ Loop:
 func (s *Session) writeProposalsAnswer(rw io.ReadWriter, proposals []*Proposal) (nAccepted int, err error) {
 	answers := make([]byte, len(proposals))
 
+	seen := make(map[string]bool)
+
 	for i, prop := range proposals {
-		if prop.code != Wl2kProposal && prop.code != GzipProposal {
+		if seen[prop.MID()] {
+			// Radio Only gateways will sometimes send multiple proposals for the same MID in the same batch.
+			// Instead of rejecting them right away, let's defer the dups until we know we have sucessfully received at least one of the copies.
+			s.log.Printf("Defering duplicate message %s", prop.MID())
+			prop.answer = Defer
+		} else if prop.code != Wl2kProposal && prop.code != GzipProposal {
 			s.log.Printf("Defering %s (unsupported format)", prop.MID())
 			prop.answer = Defer
 		} else if s.h == nil {
@@ -306,6 +313,7 @@ func (s *Session) writeProposalsAnswer(rw io.ReadWriter, proposals []*Proposal) 
 			nAccepted++
 		}
 
+		seen[prop.MID()] = true
 		answers[i] = byte(prop.answer)
 	}
 
