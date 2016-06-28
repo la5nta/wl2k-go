@@ -42,8 +42,9 @@ type TNC struct {
 
 	heard map[string]time.Time
 
-	connected      bool
-	listenerActive bool
+	connected       bool
+	listenerActive  bool
+	disconnectDefer []func(tnc *TNC) error
 }
 
 func Open(addr string, mycall, gridSquare string) (*TNC, error) {
@@ -140,6 +141,17 @@ func (tnc *TNC) init() (err error) {
 	return nil
 }
 
+// onDisconnect defers a function that is called after NEWSTATE DISCONNECT
+//
+// Useful to reset connection-spesific global state (e.g. mycall).
+func (tnc *TNC) onDisconnect(fn func(tnc *TNC) error) {
+	if tnc.disconnectDefer == nil {
+		tnc.disconnectDefer = make([]func(tnc *TNC) error, 0, 1)
+	}
+
+	tnc.disconnectDefer = append(tnc.disconnectDefer, fn)
+}
+
 func (tnc *TNC) runControlLoop() error {
 	// Read prompt so we know the TNC is ready
 	tnc.ctrl.SetReadDeadline(time.Now().Add(3 * time.Second))
@@ -175,18 +187,29 @@ func (tnc *TNC) runControlLoop() error {
 			case cmdNewState:
 				tnc.state = msg.State()
 
-				// Close ongoing connections if the new state is Disconnected
-				if msg.State() == Disconnected && tnc.data != nil {
-					tnc.connected = false // connect() is responsible for setting it to true
-					if tcpConn := tnc.data.Conn.(*net.TCPConn); !selfDisconnect {
-						tcpConn.CloseRead()
-						tcpConn.CloseWrite()
-						tnc.data.flushLock.Unlock()
-					} else {
-						tcpConn.Close()
-						selfDisconnect = false
+				switch msg.State() {
+				case Disconnected:
+					// Close ongoing connection
+					if tnc.data != nil {
+						tnc.connected = false // connect() is responsible for setting it to true
+						if tcpConn := tnc.data.Conn.(*net.TCPConn); !selfDisconnect {
+							tcpConn.CloseRead()
+							tcpConn.CloseWrite()
+							tnc.data.flushLock.Unlock()
+						} else {
+							tcpConn.Close()
+							selfDisconnect = false
+						}
+						tnc.data = nil
 					}
-					tnc.data = nil
+
+					// Run defered functions (onDisconnect)
+					go func() {
+						for _, fn := range tnc.disconnectDefer {
+							fn(tnc)
+						}
+						tnc.disconnectDefer = nil
+					}() //TODO: We really need some mutexes here!
 				}
 			case cmdBusy:
 				tnc.busy = msg.value.(bool)

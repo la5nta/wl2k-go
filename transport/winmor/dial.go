@@ -79,10 +79,25 @@ func (conn *tncConn) updateBuffers(b []int) {
 }
 
 // DialURL dials winmor:// URLs
+//
+// Syntax: winmor://mycall@/targetcall (mycall part is optional)
 func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 	if url.Scheme != "winmor" {
 		return nil, transport.ErrUnsupportedScheme
 	}
+
+	if url.User != nil {
+		original, err := tnc.MyCall()
+		if err != nil {
+			return nil, err
+		}
+		tnc.onDisconnect(func(tnc *TNC) error { return tnc.SetMycall(original) })
+
+		if err := tnc.SetMycall(url.User.Username()); err != nil {
+			return nil, err
+		}
+	}
+
 	return tnc.Dial(url.Target)
 }
 
