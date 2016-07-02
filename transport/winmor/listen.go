@@ -32,8 +32,11 @@ func (l listener) Accept() (c net.Conn, err error) {
 			return nil, errClosing
 		}
 		return c, nil
-	case err = <-l.errors:
-		return
+	case err, ok := <-l.errors:
+		if !ok {
+			return nil, errClosing
+		}
+		return nil, err
 	}
 }
 
