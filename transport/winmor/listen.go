@@ -7,7 +7,6 @@ package winmor
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"time"
 )
@@ -15,6 +14,8 @@ import (
 var (
 	ErrInvalidBandwidth     error = errors.New("Invalid bandwidth. Supported values are 500 or 1600.")
 	ErrActiveListenerExists error = errors.New("An active listener is already registered with this TNC.")
+
+	errClosing = errors.New("use of closed network connection") // From the net package
 )
 
 type listener struct {
@@ -28,7 +29,7 @@ func (l listener) Accept() (c net.Conn, err error) {
 	select {
 	case c, ok := <-l.incoming:
 		if !ok {
-			return nil, io.EOF
+			return nil, errClosing
 		}
 		return c, nil
 	case err = <-l.errors:
