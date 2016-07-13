@@ -6,26 +6,43 @@ package lzhuf
 
 import (
 	"bytes"
+	"io"
 	"testing"
 )
 
-func TestEncode(t *testing.T) {
+func TestReader(t *testing.T) {
 	for i, sample := range samples {
-		comp := Encode(sample.plain)
-		if !bytes.Equal(comp, sample.compressed) {
-			t.Errorf("Sample %d failed.", i)
+		lz := NewReader(bytes.NewReader(sample.compressed), true)
+
+		var buf bytes.Buffer
+		_, err := io.Copy(&buf, lz)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %s", err)
+		}
+
+		if !bytes.Equal(buf.Bytes(), sample.plain) {
+			t.Errorf("Sample %d failed", i)
 		}
 	}
 }
 
-func TestDecode(t *testing.T) {
+func TestWriter(t *testing.T) {
 	for i, sample := range samples {
-		plain := Decode(sample.compressed)
-		if !bytes.Equal(plain, sample.plain) {
-			if len(sample.plain) < 10 {
-				continue
-			}
-			t.Errorf("Sample %d failed.", i)
+		var buf bytes.Buffer
+		lz := NewWriter(&buf, true)
+
+		_, err := io.Copy(lz, bytes.NewReader(sample.plain))
+		if err != nil {
+			t.Errorf("Unexpected error: %s", err)
+		}
+
+		if err := lz.Close(); err != nil {
+			t.Errorf("Close error: %s", err)
+		}
+
+		if !bytes.Equal(buf.Bytes(), sample.compressed) {
+			t.Errorf("Sample %d failed", i)
 		}
 	}
 }
