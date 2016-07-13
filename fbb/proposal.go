@@ -68,21 +68,23 @@ func NewProposal(MID, title string, code PropCode, data []byte) *Proposal {
 		prop.title = `No title`
 	}
 
-	if prop.code == GzipProposal {
-		// Gzip compressed
-		var buf bytes.Buffer
-		z, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-		if err != nil {
-			panic(err)
-		}
-
-		z.Write(data)
-		z.Close()
-		prop.compressedData = buf.Bytes()
-	} else {
-		// LZHUF compressed
-		prop.compressedData = lzhuf.Encode(data)
+	var (
+		z   io.WriteCloser
+		buf bytes.Buffer
+	)
+	switch prop.code {
+	case GzipProposal:
+		z, _ = gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	default:
+		z = lzhuf.NewB2Writer(&buf)
 	}
+
+	z.Write(data)
+	if err := z.Close(); err != nil {
+		panic(err)
+	}
+
+	prop.compressedData = buf.Bytes()
 	prop.compressedSize = len(prop.compressedData)
 
 	return prop
@@ -117,20 +119,23 @@ func (p *Proposal) Message() (*Message, error) {
 
 // Data returns the decompressed raw message
 func (p *Proposal) Data() []byte {
-	if p.code == GzipProposal {
-		return p.gzipData()
-	}
-	return lzhuf.Decode(p.compressedData) //TODO: Should return error when decompress fails
-}
-
-func (p *Proposal) gzipData() []byte {
-	rd, err := gzip.NewReader(bytes.NewBuffer(p.compressedData))
-	if err != nil {
-		panic(err)
+	var r io.ReadCloser
+	switch p.code {
+	case GzipProposal:
+		var err error
+		r, err = gzip.NewReader(bytes.NewBuffer(p.compressedData))
+		if err != nil {
+			panic(err) //TODO: Should return error
+		}
+	default:
+		r = lzhuf.NewB2Reader(bytes.NewBuffer(p.compressedData))
 	}
 
 	var buf bytes.Buffer
-	io.Copy(&buf, rd)
+	if _, err := io.Copy(&buf, r); err != nil {
+		panic(err) //TODO
+	}
+
 	return buf.Bytes()
 }
 
