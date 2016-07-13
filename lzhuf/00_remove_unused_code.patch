@@ -15,7 +15,7 @@ index b265fc0..b6406b7 100644
 @@ -53,0 +56,35 @@ static char EarlyDisconnect[] = "lzhuf: unexpected disconnect";
 +// added by martin
 +void no_log(int i, char const* args, ...){};
-+int pwait(void* event){};
++int pwait(void* event){ return 0; };
 +
 +struct lzhufstruct* AllocStruct() {
 +	struct lzhufstruct *lzhuf = (struct lzhufstruct *)calloc(sizeof(struct lzhufstruct),1);
