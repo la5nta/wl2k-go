@@ -233,7 +233,7 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 	if err == nil {
 		return nil // Connected
 	} else if err != syscall.EINPROGRESS {
-		return fmt.Errorf("Unable to connect: %s", err)
+		return err
 	}
 
 	// Shamelessly stolen from src/pkg/exp/inotify/inotify_linux.go:
@@ -260,7 +260,7 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 		n, err = syscall.Select(int(sock)+1, nil, fdset, nil, &tv)
 		if n < 0 && err != syscall.EINTR {
 			sock.close()
-			return fmt.Errorf("Unable to connect: %s", err)
+			return err
 		} else if n > 0 {
 			// Verify that connection is OK
 			nerr, err := syscall.GetsockoptInt(int(sock), syscall.SOL_SOCKET, syscall.SO_ERROR)
@@ -277,7 +277,7 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 			}
 		} else {
 			sock.close()
-			return fmt.Errorf("Unable to connect: timeout")
+			return fmt.Errorf("Dial timeout")
 		}
 	}
 
