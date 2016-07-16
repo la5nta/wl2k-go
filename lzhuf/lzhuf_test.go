@@ -5,10 +5,46 @@
 package lzhuf
 
 import (
+	"bufio"
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+func TestRoundtrip(t *testing.T) {
+	file, err := os.Open(filepath.Join(runtime.GOROOT(), "src/compress/testdata/Mark.Twain-Tom.Sawyer.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	var orig bytes.Buffer
+
+	// Compress (and tee to orig for comparison)
+	var compressed bytes.Buffer
+	w := NewB2Writer(&compressed)
+	io.Copy(w, io.TeeReader(file, &orig))
+	w.Close()
+
+	r := NewB2Reader(&compressed)
+
+	rd := bufio.NewReader(r)
+	for i := 0; orig.Len() > 0; i++ {
+		c, _ := orig.ReadByte()
+		d, _ := rd.ReadByte()
+		if c != d {
+			t.Errorf("Byte idx %d not matching. Skipping rest of compare.", i)
+			break
+		}
+	}
+
+	if err := r.Close(); err != nil {
+		t.Error(err)
+	}
+}
 
 func TestReader(t *testing.T) {
 	for i, sample := range samples {
@@ -41,7 +77,15 @@ func TestWriter(t *testing.T) {
 			t.Errorf("Close error: %s", err)
 		}
 
-		if !bytes.Equal(buf.Bytes(), sample.compressed) {
+		if !bytes.Equal(buf.Bytes()[0:2], sample.compressed[0:2]) {
+			t.Errorf("Sample %d failed: checksum mismatch", i)
+		}
+
+		if !bytes.Equal(buf.Bytes()[2:6], sample.compressed[2:6]) {
+			t.Errorf("Sample %d failed: length header mismatch", i)
+		}
+
+		if !bytes.Equal(buf.Bytes()[6:], sample.compressed[6:]) {
 			t.Errorf("Sample %d failed", i)
 		}
 	}
