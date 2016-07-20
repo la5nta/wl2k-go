@@ -1,3 +1,10 @@
+This is a Go port of the lzhuf compression code from JNOS 2 (lzhuf.c).
+
+This file holds the licensing information on the (now deleted) lzhuf.c code that this Go port was based on.
+
+Martin Hebnes Pedersen 2016/07/19
+
+------------------------------------------------------
 This file holds information about the origin of lzhuf.c and lzhuf.h.
 
 The files have been copied from b2229b973b4094a1c697f480926bf61c21ef4def@github.com/mlangelaar/jnos2.

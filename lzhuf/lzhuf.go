@@ -1,4 +1,4 @@
-// Copyright 2015 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
+// Copyright 2016 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
@@ -7,167 +7,350 @@
 // The compression is LZHUF with a CRC16 checksum of the compressed data prepended (B2F option).
 package lzhuf
 
-// #cgo CFLAGS: -DLZHUF=1 -DB2F=1
-// #include "lzhuf.h"
-import "C"
+const (
+	// LZHUF variables
+	_N         = 2048 // Buffer size
+	_F         = 60   // Lookahead buffer size
+	_NIL       = _N   // Leaf of tree
+	_THRESHOLD = 2
+	_N_CHAR    = 256 - _THRESHOLD + _F // Kinds of characters (character code = 0..N_CHAR-1)
+	_T         = (_N_CHAR * 2) - 1     // Size of table
+	_R         = _T - 1                // Position of root
+	_MAX_FREQ  = 0x8000                // Updates tree when the
 
-import (
-	"bytes"
-	"errors"
-	"io"
-	"io/ioutil"
-	"os"
-	"syscall"
 )
 
-var ErrChecksum = errors.New("lzhuf: invalid checksum")
+type lzhuf struct {
+	// Frequency table.
+	freq [_T + 1]uint
 
-//TODO:
-// * Modify lzhuf.c's Encode() so we don't have to use temp files.
-// * Handle go errors.
-func encDec(data []byte, encode bool, crc16 bool) ([]byte, error) {
-	// Create temp files
-	outf, _ := ioutil.TempFile("", "lzhuf")
-	inf, _ := ioutil.TempFile("", "lzhuf")
-	defer func() {
-		outf.Close()
-		os.Remove(outf.Name())
-		os.Remove(inf.Name())
-	}()
+	// Pointers to parent nodes.
+	//
+	// Expect for the elements [T..T+N_CHAR-1] which are
+	// used to get the positions of leaves corresponding to the codes.
+	prnt [_T + _N_CHAR]int
 
-	// Copy data to in file
-	io.Copy(inf, bytes.NewBuffer(data))
-	inf.Sync()
-	inf.Close()
+	// Pointers to child nodes.
+	son [_T]int
 
-	var bFlag C.int
-	if crc16 {
-		bFlag = 1
-	} else {
-		bFlag = 0
-	}
+	dad  [_N + 1]int
+	lson [_N + 1]int
+	rson [_N + 257]int
 
-	// Encode/Decode the inf to outf
-	lzs := C.AllocStruct()
-	var retval C.int
-	if encode {
-		retval = C.Encode(0, C.CString(inf.Name()), C.CString(outf.Name()), lzs, bFlag)
-	} else {
-		retval = C.Decode(0, C.CString(inf.Name()), C.CString(outf.Name()), lzs, bFlag)
-	}
-	C.FreeStruct(lzs)
-
-	if retval == -1 {
-		return nil, ErrChecksum
-	} else if retval != 0 {
-		return nil, syscall.Errno(uintptr(retval))
-	}
-
-	// Read the compressed/decompressed data from outf
-	b, _ := ioutil.ReadAll(outf)
-
-	return b, nil
+	textBuf       [_N + _F - 1]byte
+	matchLength   int
+	matchPosition int
 }
 
-// A Reader is an io.Reader that can be read to retrieve
-// uncompressed data from a lzhuf-compressed file.
-//
-// Lzhuf files store a length and optionally a checksum of the uncompressed data.
-// The Reader will return a ErrChecksum when Read
-// reaches the end of the uncompressed data if it does not
-// have the expected length or checksum.  Clients should treat data
-// returned by Read as tentative until they receive the io.EOF
-// marking the end of the data.
-type Reader struct {
-	r            io.Reader
-	crc16        bool
-	uncompressed *bytes.Reader
-	err          error
+func (z *lzhuf) InitTree() {
+	for i := _N + 1; i <= _N+256; i++ {
+		z.rson[i] = _NIL // root
+	}
+	for i := 0; i < _N; i++ {
+		z.dad[i] = _NIL // node
+	}
 }
 
-// NewB2Writer creates a new Reader expecting the extended FBB B2 format used by Winlink.
-//
-// It is the caller's responsibility to call Close on the Reader when done.
-func NewB2Reader(r io.Reader) (*Reader, error) { return NewReader(r, true) }
+// TODO: Should not be exported
+func newLZHUFF() *lzhuf {
+	z := new(lzhuf)
 
-// NewReader creates a new Reader reading the given reader.
-//
-// If crc16 is true, the Reader will expect and verify a checksum of the compressed data (as per FBB B2).
-//
-// It is the caller's responsibility to call Close on the Reader when done.
-func NewReader(r io.Reader, crc16 bool) (*Reader, error) { return &Reader{r: r, crc16: crc16}, nil }
+	for i := 0; i < _N_CHAR; i++ {
+		z.freq[i] = 1
+		z.son[i] = i + _T
+		z.prnt[i+_T] = i
+	}
 
-// Read reads uncompressed data into p. It returns the number of bytes read into p.
-//
-// At EOF, count is 0 and err is io.EOF (unless len(p) is zero).
-func (z *Reader) Read(p []byte) (int, error) {
-	if z.uncompressed == nil {
-		var buf bytes.Buffer
+	for i, j := 0, _N_CHAR; j <= _R; {
+		z.freq[j] = z.freq[i] + z.freq[i+1]
+		z.son[j] = i
+		z.prnt[i] = j
+		z.prnt[i+1] = j
+		i += 2
+		j++
+	}
+	z.freq[_T] = 0xffff
+	z.prnt[_R] = 0
 
-		if _, err := io.Copy(&buf, z.r); err != nil {
-			return 0, err
+	return z
+}
+
+// Delete from tree
+func (z *lzhuf) DeleteNode(p int) {
+	if z.dad[p] == _NIL {
+		return // not registered
+	}
+
+	var q int
+	switch {
+	case z.rson[p] == _NIL:
+		q = z.lson[p]
+	case z.lson[p] == _NIL:
+		q = z.rson[p]
+	default:
+		q = z.lson[p]
+		if z.rson[q] != _NIL {
+			for z.rson[q] != _NIL {
+				q = z.rson[q]
+			}
+			z.rson[z.dad[q]] = z.lson[q]
+			z.dad[z.lson[q]] = z.dad[q]
+			z.lson[q] = z.lson[p]
+			z.dad[z.lson[p]] = q
+		}
+		z.rson[q] = z.rson[p]
+		z.dad[z.rson[p]] = q
+	}
+
+	z.dad[q] = z.dad[p]
+	if z.rson[z.dad[p]] == p {
+		z.rson[z.dad[p]] = q
+	} else {
+		z.lson[z.dad[p]] = q
+	}
+
+	z.dad[p] = _NIL
+}
+
+// Insert to tree
+func (z *lzhuf) InsertNode(r int) {
+	var i, p, cmp int
+	var key []byte
+	var c uint
+
+	cmp = 1
+	key = z.textBuf[r:]
+	p = _N + 1 + int(key[0])
+	z.rson[r], z.lson[r] = _NIL, _NIL
+	z.matchLength = 0
+	for {
+		if cmp >= 0 {
+			if z.rson[p] != _NIL {
+				p = z.rson[p]
+			} else {
+				z.rson[p] = r
+				z.dad[r] = p
+				return
+			}
+		} else {
+			if z.lson[p] != _NIL {
+				p = z.lson[p]
+			} else {
+				z.lson[p] = r
+				z.dad[r] = p
+				return
+			}
+		}
+		for i = 1; i < _F; i++ {
+			cmp = int(key[i]) - int(z.textBuf[p+i])
+			if cmp != 0 {
+				break
+			}
+		}
+		if i > _THRESHOLD {
+			if i > z.matchLength {
+				z.matchPosition = ((r - p) & (_N - 1)) - 1
+				z.matchLength = i
+				if z.matchLength >= _F {
+					break
+				}
+			}
+			if i == z.matchLength {
+				c = uint(((r - p) & (_N - 1)) - 1)
+				if int(c) < z.matchPosition {
+					z.matchPosition = int(c)
+				}
+			}
+		}
+	}
+	z.dad[r] = z.dad[p]
+	z.lson[r] = z.lson[p]
+	z.rson[r] = z.rson[p]
+	z.dad[z.lson[p]] = r
+	z.dad[z.rson[p]] = r
+	if z.rson[z.dad[p]] == p {
+		z.rson[z.dad[p]] = r
+	} else {
+		z.lson[z.dad[p]] = r
+	}
+	z.dad[p] = _NIL // remove p
+}
+
+func (z *lzhuf) reconst() {
+	// collect leaf nodes in the first half of the table and replace the freq by (freq + 1) / 2
+	for i, j := 0, 0; i < _T; i++ {
+		if z.son[i] >= _T {
+			z.freq[j] = (z.freq[i] + 1) / 2
+			z.son[j] = z.son[i]
+			j++
+		}
+	}
+
+	// Begin constructing tree by connecting children nodes
+	for i, j := 0, _N_CHAR; j < _T; i, j = i+2, j+1 {
+		k := i + 1
+		z.freq[j] = z.freq[i] + z.freq[k]
+
+		first := uint(z.freq[j])
+		for k = j; first < uint(z.freq[k-1]); {
+			k--
 		}
 
-		var data []byte
-		data, z.err = encDec(buf.Bytes(), false, z.crc16)
-		z.uncompressed = bytes.NewReader(data)
+		last := int(j - k) // Number of elements to move right
+
+		copy(z.freq[k+1:], z.freq[k:k+last])
+		z.freq[k] = first
+
+		copy(z.son[k+1:], z.son[k:k+last])
+		z.son[k] = i
 	}
 
-	if z.err != nil {
-		return 0, z.err
-	}
-
-	return z.uncompressed.Read(p)
-}
-
-// Close closes the Reader. It does not close the underlying io.Reader.
-func (z *Reader) Close() error {
-	// Future implementation need to check that we reached io.EOF or encountered
-	// any other error while reading.
-	return z.err
-}
-
-// A Writer is an io.WriteCloser.
-// Writes to a Writer are compressed and writter to w.
-type Writer struct {
-	w     io.Writer
-	crc16 bool
-	buf   *bytes.Buffer
-}
-
-// NewB2Writer returns a new Writer with the extended FBB B2 format used by Winlink.
-//
-// It is the caller's responsibility to call Close on the WriteCloser when done.
-// Writes may be buffered and not flushed until Close.
-func NewB2Writer(w io.Writer) *Writer { return NewWriter(w, true) }
-
-// NewWriter returns a new Writer. Writes to the returned writer are compressed and written to w.
-//
-// If crc16 is true, the header will be prepended with a checksum of the compressed data (as per FBB B2).
-//
-// It is the caller's responsibility to call Close on the WriteCloser when done.
-// Writes may be buffered and not flushed until Close.
-func NewWriter(w io.Writer, crc16 bool) *Writer {
-	return &Writer{
-		w:     w,
-		crc16: crc16,
-		buf:   new(bytes.Buffer),
+	// Connect parent nodes
+	for i := 0; i < _T; i++ {
+		k := z.son[i]
+		if k >= _T {
+			z.prnt[k] = i
+		} else {
+			z.prnt[k+1] = i
+			z.prnt[k] = i
+		}
 	}
 }
 
-// Write writes a compressed form of p to the underlying io.Writer. The
-// compressed bytes are not necessarily flushed until the Writer is closed.
-func (z *Writer) Write(p []byte) (int, error) { return z.buf.Write(p) }
-
-// Close closes the Writer, flushing any unwritten data to the underlying
-// io.Writer, but does not close the underlying io.Writer.
-func (z *Writer) Close() error {
-	data, err := encDec(z.buf.Bytes(), true, z.crc16)
-	if err != nil {
-		return err
+func (z *lzhuf) update(c int) {
+	if z.freq[_R] == _MAX_FREQ {
+		z.reconst()
 	}
 
-	_, err = z.w.Write(data)
+	// Swap nodes to keep the tree freq-ordered
+	for c := z.prnt[c+_T]; c != 0; c = z.prnt[c] {
+		z.freq[c]++
 
-	return err
+		if z.freq[c] <= z.freq[c+1] || len(z.freq) <= c+2 {
+			continue // Order is ok
+		}
+
+		l, k := c+1, z.freq[c]
+		for k > z.freq[l+1] {
+			l++
+		}
+
+		z.freq[c] = z.freq[l]
+		z.freq[l] = k
+
+		i := z.son[c]
+		z.prnt[i] = l
+		if i < _T {
+			z.prnt[i+1] = l
+		}
+
+		j := z.son[l]
+		z.son[l] = i
+
+		z.prnt[j] = c
+		if j < _T {
+			z.prnt[j+1] = c
+		}
+		z.son[c] = j
+
+		c = l
+	}
+}
+
+/*
+ * Huffman coding
+ *
+ * table for encoding and decoding the upper 6 bits of position
+ */
+
+// for encoding
+var p_code = [64]byte{
+	0x00, 0x20, 0x30, 0x40, 0x50, 0x58, 0x60, 0x68,
+	0x70, 0x78, 0x80, 0x88, 0x90, 0x94, 0x98, 0x9C,
+	0xA0, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC,
+	0xC0, 0xC2, 0xC4, 0xC6, 0xC8, 0xCA, 0xCC, 0xCE,
+	0xD0, 0xD2, 0xD4, 0xD6, 0xD8, 0xDA, 0xDC, 0xDE,
+	0xE0, 0xE2, 0xE4, 0xE6, 0xE8, 0xEA, 0xEC, 0xEE,
+	0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7,
+	0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
+}
+var p_len = [64]byte{
+	0x03, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+}
+
+// for decoding
+var d_code = [256]byte{
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+	0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+	0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+	0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09,
+	0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A,
+	0x0B, 0x0B, 0x0B, 0x0B, 0x0B, 0x0B, 0x0B, 0x0B,
+	0x0C, 0x0C, 0x0C, 0x0C, 0x0D, 0x0D, 0x0D, 0x0D,
+	0x0E, 0x0E, 0x0E, 0x0E, 0x0F, 0x0F, 0x0F, 0x0F,
+	0x10, 0x10, 0x10, 0x10, 0x11, 0x11, 0x11, 0x11,
+	0x12, 0x12, 0x12, 0x12, 0x13, 0x13, 0x13, 0x13,
+	0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15,
+	0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17,
+	0x18, 0x18, 0x19, 0x19, 0x1A, 0x1A, 0x1B, 0x1B,
+	0x1C, 0x1C, 0x1D, 0x1D, 0x1E, 0x1E, 0x1F, 0x1F,
+	0x20, 0x20, 0x21, 0x21, 0x22, 0x22, 0x23, 0x23,
+	0x24, 0x24, 0x25, 0x25, 0x26, 0x26, 0x27, 0x27,
+	0x28, 0x28, 0x29, 0x29, 0x2A, 0x2A, 0x2B, 0x2B,
+	0x2C, 0x2C, 0x2D, 0x2D, 0x2E, 0x2E, 0x2F, 0x2F,
+	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+	0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
+}
+var d_len = [256]byte{
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
 }

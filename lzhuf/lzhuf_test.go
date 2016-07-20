@@ -66,6 +66,58 @@ func TestRoundtrip(t *testing.T) {
 	}
 }
 
+func TestReaderUnexpectedEOF(t *testing.T) {
+	lz, _ := NewReader(bytes.NewReader(samples[2].compressed[:10]), true)
+	if _, err := io.Copy(ioutil.Discard, lz); err != io.ErrUnexpectedEOF {
+		t.Errorf("Read: Expected io.ErrUnexpectedEOF, got '%v'", err)
+	}
+	if err := lz.Close(); err != io.ErrUnexpectedEOF {
+		t.Errorf("Close: Expected io.ErrUnexpectedEOF, got '%s'", err)
+	}
+}
+
+func TestB2ReaderInvalidChecksum(t *testing.T) {
+	data := make([]byte, len(samples[0].compressed))
+	copy(data, samples[0].compressed)
+	data[0] = 0x1 // Invalid checksum
+
+	lz, _ := NewB2Reader(bytes.NewReader(data))
+	io.Copy(ioutil.Discard, lz)
+	if err := lz.Close(); err != ErrChecksum {
+		t.Error("Did not receive ErrChecksum from Close")
+	}
+}
+
+func TestReaderShortRead(t *testing.T) {
+	// With crc16 checksum
+	lz, _ := NewB2Reader(bytes.NewReader(samples[4].compressed))
+	io.CopyN(ioutil.Discard, lz, int64(len(samples[4].compressed)-1))
+	if err := lz.Close(); err != ErrChecksum {
+		t.Error("Did not receive ErrChecksum from Close on short read with crc16", err)
+	}
+
+	// Without crc16 checksum
+	lz, _ = NewReader(bytes.NewReader(samples[4].compressed[2:]), false)
+	io.CopyN(ioutil.Discard, lz, int64(len(samples[4].compressed[2:])-1))
+	if err := lz.Close(); err != ErrChecksum {
+		t.Error("Did not receive ErrChecksum from Close on short read without crc16", err)
+	}
+}
+
+func TestReaderInvalidHeader(t *testing.T) {
+	var err error
+
+	_, err = NewB2Reader(bytes.NewReader([]byte{0x0}))
+	if err != io.ErrUnexpectedEOF {
+		t.Error("Expected io.ErrUnexpectedEOF on too short crc16 checksum, got:", err)
+	}
+
+	_, err = NewReader(bytes.NewReader([]byte{0x0}), false)
+	if err != io.ErrUnexpectedEOF {
+		t.Error("Expected io.ErrUnexpectedEOF on too filesize header, got:", err)
+	}
+}
+
 func TestReader(t *testing.T) {
 	for i, sample := range samples {
 		lz, err := NewReader(bytes.NewReader(sample.compressed), true)
