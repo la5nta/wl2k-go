@@ -1,4 +1,4 @@
-// Copyright 2015 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
+// Copyright 2016 Martin Hebnes Pedersen (LA5NTA). All rights reserved.
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
@@ -8,51 +8,74 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
+var testdataPath = "testdata/"
+
 func TestRoundtrip(t *testing.T) {
-	file, err := os.Open(filepath.Join(runtime.GOROOT(), "src/compress/testdata/Mark.Twain-Tom.Sawyer.txt"))
+	files, err := ioutil.ReadDir(testdataPath)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Unable to open testdata directory:", err)
 	}
-	defer file.Close()
 
-	var orig bytes.Buffer
-
-	// Compress (and tee to orig for comparison)
-	var compressed bytes.Buffer
-	w := NewB2Writer(&compressed)
-	io.Copy(w, io.TeeReader(file, &orig))
-	w.Close()
-
-	r, _ := NewB2Reader(&compressed)
-
-	rd := bufio.NewReader(r)
-	for i := 0; orig.Len() > 0; i++ {
-		c, _ := orig.ReadByte()
-		d, _ := rd.ReadByte()
-		if c != d {
-			t.Errorf("Byte idx %d not matching. Skipping rest of compare.", i)
-			break
+	for _, fi := range files {
+		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" {
+			continue
 		}
-	}
 
-	if err := r.Close(); err != nil {
-		t.Error(err)
+		t.Logf("Running %s...", fi.Name())
+		file, err := os.Open(filepath.Join(testdataPath, fi.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var orig bytes.Buffer
+
+		// Compress (and tee to orig for comparison)
+		var compressed bytes.Buffer
+		w := NewB2Writer(&compressed)
+		io.Copy(w, io.TeeReader(file, &orig))
+		w.Close()
+
+		r, err := NewB2Reader(&compressed)
+		if err != nil {
+			t.Errorf("%s: Unexpected NewB2Reader error: %s", fi.Name(), err)
+			continue
+		}
+
+		rd := bufio.NewReader(r)
+		for i := 0; orig.Len() > 0; i++ {
+			c, _ := orig.ReadByte()
+			d, _ := rd.ReadByte()
+
+			if c != d {
+				t.Errorf("%s: Byte idx %d not matching. Skipping rest of compare.", fi.Name(), i)
+				break
+			}
+		}
+
+		if err := r.Close(); err != nil {
+			t.Errorf("%s: Unexpected Close error: %s", fi.Name(), err)
+		}
+
+		file.Close()
 	}
 }
 
 func TestReader(t *testing.T) {
 	for i, sample := range samples {
-		lz, _ := NewReader(bytes.NewReader(sample.compressed), true)
+		lz, err := NewReader(bytes.NewReader(sample.compressed), true)
+		if err != nil {
+			t.Errorf("Unexpected NewReader error: %s", err)
+			continue
+		}
 
 		var buf bytes.Buffer
-		_, err := io.Copy(&buf, lz)
-
+		_, err = io.Copy(&buf, lz)
 		if err != nil {
 			t.Errorf("Unexpected error: %s", err)
 		}
@@ -60,6 +83,54 @@ func TestReader(t *testing.T) {
 		if !bytes.Equal(buf.Bytes(), sample.plain) {
 			t.Errorf("Sample %d failed", i)
 		}
+
+		if err := lz.Close(); err != nil {
+			t.Errorf("Sample %d failed on close: %s", i, err)
+		}
+	}
+}
+
+func TestWriterTestdata(t *testing.T) {
+	files, err := ioutil.ReadDir(testdataPath)
+	if err != nil {
+		t.Fatal("Unable to open testdata directory:", err)
+	}
+
+	for _, fi := range files {
+		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" {
+			continue
+		}
+
+		t.Logf("Running %s...", fi.Name())
+		file, err := os.Open(filepath.Join(testdataPath, fi.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Compress (and tee to orig for comparison)
+		var compressed bytes.Buffer
+		w := NewB2Writer(&compressed)
+		io.Copy(w, file)
+		w.Close()
+
+		f, err := os.Open(filepath.Join("testdata", fi.Name()+".lzh"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rd := bufio.NewReader(f)
+		for i := 0; compressed.Len() > 0; i++ {
+			c, _ := compressed.ReadByte()
+			d, _ := rd.ReadByte()
+
+			if c != d {
+				t.Errorf("%s: Byte idx %d not matching. Skipping rest of compare.", fi.Name(), i)
+				break
+			}
+		}
+
+		file.Close()
+		f.Close()
 	}
 }
 
