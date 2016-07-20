@@ -120,15 +120,17 @@ func (p *Proposal) Message() (*Message, error) {
 // Data returns the decompressed raw message
 func (p *Proposal) Data() []byte {
 	var r io.ReadCloser
+	var err error
+
 	switch p.code {
 	case GzipProposal:
-		var err error
 		r, err = gzip.NewReader(bytes.NewBuffer(p.compressedData))
-		if err != nil {
-			panic(err) //TODO: Should return error
-		}
 	default:
-		r = lzhuf.NewB2Reader(bytes.NewBuffer(p.compressedData))
+		r, err = lzhuf.NewB2Reader(bytes.NewBuffer(p.compressedData))
+	}
+
+	if err != nil {
+		panic(err) //TODO: Should return error
 	}
 
 	var buf bytes.Buffer
