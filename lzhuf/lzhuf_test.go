@@ -29,7 +29,7 @@ func TestRoundtrip(t *testing.T) {
 	io.Copy(w, io.TeeReader(file, &orig))
 	w.Close()
 
-	r := NewB2Reader(&compressed)
+	r, _ := NewB2Reader(&compressed)
 
 	rd := bufio.NewReader(r)
 	for i := 0; orig.Len() > 0; i++ {
@@ -48,7 +48,7 @@ func TestRoundtrip(t *testing.T) {
 
 func TestReader(t *testing.T) {
 	for i, sample := range samples {
-		lz := NewReader(bytes.NewReader(sample.compressed), true)
+		lz, _ := NewReader(bytes.NewReader(sample.compressed), true)
 
 		var buf bytes.Buffer
 		_, err := io.Copy(&buf, lz)

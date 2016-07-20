@@ -88,14 +88,14 @@ type Reader struct {
 // NewB2Writer creates a new Reader expecting the extended FBB B2 format used by Winlink.
 //
 // It is the caller's responsibility to call Close on the Reader when done.
-func NewB2Reader(r io.Reader) *Reader { return NewReader(r, true) }
+func NewB2Reader(r io.Reader) (*Reader, error) { return NewReader(r, true) }
 
 // NewReader creates a new Reader reading the given reader.
 //
 // If crc16 is true, the Reader will expect and verify a checksum of the compressed data (as per FBB B2).
 //
 // It is the caller's responsibility to call Close on the Reader when done.
-func NewReader(r io.Reader, crc16 bool) *Reader { return &Reader{r: r, crc16: crc16} }
+func NewReader(r io.Reader, crc16 bool) (*Reader, error) { return &Reader{r: r, crc16: crc16}, nil }
 
 // Read reads uncompressed data into p. It returns the number of bytes read into p.
 //
