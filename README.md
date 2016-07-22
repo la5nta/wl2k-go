@@ -60,11 +60,7 @@ The gzip feature works transparently, which means that it will not break protoco
 
 ## lzhuf: The compression
 
-This package provides Go bindings to a C implementation of lzhuf, cgo is required.
-
-The actual implementation used has been copied from [JNOS 2](http://www.langelaar.net/projects/jnos2), with kind permissions of Maiko Langelaar. See the COPYRIGHT file under lzhuf/ for more information.
-
-Thanks to Maiko Langelaar, Jack Snodgrass and other JNOS contributors :-)
+Package lzhuf implements the lzhuf compression used by the binary FBB protocols B, B1 and B2.
 
 For detailed package documentation, see <http://godoc.org/github.com/la5nta/wl2k-go/lzhuf>.
 
@@ -127,7 +123,7 @@ Copyright (c) 2014-2015 Martin Hebnes Pedersen LA5NTA
 
 ## Thanks to
 
-The JNOS developers for the properly maintained lzhuf implementation, as well as the original author Haruyasu Yoshizaki.
+The JNOS developers for the lzhuf implementation which got ported to Go.
 
 The paclink-unix team (Nicholas S. Castellano N2QZ and others) - reference implementation
 
