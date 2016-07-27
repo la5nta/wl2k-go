@@ -223,10 +223,14 @@ func (z *lzhuf) update(c int) {
 	}
 
 	// Swap nodes to keep the tree freq-ordered
-	for c := z.prnt[c+_T]; c != 0; c = z.prnt[c] {
+	c = z.prnt[c+_T]
+	for {
 		z.freq[c]++
 
 		if z.freq[c] <= z.freq[c+1] || len(z.freq) <= c+2 {
+			if c = z.prnt[c]; c == 0 {
+				break
+			}
 			continue // Order is ok
 		}
 
@@ -253,7 +257,9 @@ func (z *lzhuf) update(c int) {
 		}
 		z.son[c] = j
 
-		c = l
+		if c = z.prnt[l]; c == 0 {
+			break
+		}
 	}
 }
 

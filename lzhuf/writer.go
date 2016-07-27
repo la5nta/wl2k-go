@@ -170,19 +170,21 @@ func (w *Writer) encodeEnd() {
 }
 
 func (w *Writer) encodeChar(c uint) {
-	var i uint
-	var k, j int
-
 	// travel from leaf to root
-	for k = w.z.prnt[c+_T]; k != _R; k = w.z.prnt[k] {
+	i, j := uint(0), int(0)
+	k := w.z.prnt[c+_T]
+	for {
 		i >>= 1
+		j++
 
 		// if node's address is odd-numbered, choose bigger brother node
 		if k&1 != 0 {
 			i += 0x8000
 		}
 
-		j++
+		if k = w.z.prnt[k]; k == _R {
+			break
+		}
 	}
 	w.putCode(j, i)
 	w.z.update(int(c))
