@@ -11,6 +11,7 @@ import (
 	"io"
 )
 
+// ErrChecksum indicates a checksum or file size mismatch on decode.
 var ErrChecksum = errors.New("lzhuf: invalid checksum")
 
 // A Reader is an io.Reader that can be read to retrieve
@@ -42,7 +43,7 @@ type Reader struct {
 	}
 }
 
-// NewB2Writer creates a new Reader expecting the extended FBB B2 format used by Winlink.
+// NewB2Reader creates a new Reader expecting the extended FBB B2 format used by Winlink.
 //
 // It is the caller's responsibility to call Close on the Reader when done.
 func NewB2Reader(r io.Reader) (*Reader, error) { return NewReader(r, true) }
@@ -76,9 +77,9 @@ func NewReader(r io.Reader, crc16 bool) (*Reader, error) {
 // Close closes the Reader. It does not close the underlying io.Reader.
 //
 // If an error was encountered during Read, the error will be returned.
-// ErrChecksum is returned if the filesize header do not match the number
-// of bytes read, or a crc16 checksum (B2 format) was expected but did
-// not match.
+// ErrChecksum is returned if the filesize header does not match the
+// number of bytes read, or a crc16 checksum (B2 format) was expected
+// but did not match.
 //
 // If no error is returned, the file has been successfully decompressed.
 func (d *Reader) Close() error {
