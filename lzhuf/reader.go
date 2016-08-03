@@ -129,7 +129,7 @@ func (d *Reader) Read(p []byte) (n int, err error) {
 		}
 
 		i = (d.state.r - d.decodePosition() - 1) & (_N - 1)
-		j = c - 255 + _THRESHOLD
+		j = c - 255 + _Threshold
 		for k = 0; k < j; k++ {
 			c = int(d.z.textBuf[(i+k)&(_N-1)])
 			if n < len(p) {
@@ -172,8 +172,8 @@ func (d *Reader) decodePosition() int {
 
 	// Recover upper 6 bits from table
 	i = uint(d.getByte())
-	c = uint(d_code[i]) << 6
-	j = uint(d_len[i])
+	c = uint(dCode[i]) << 6
+	j = uint(dLen[i])
 
 	// Read lower 6 bits verbatim
 	for j -= 2; j > 0; j-- {

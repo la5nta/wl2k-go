@@ -151,11 +151,11 @@ func (w *Writer) encode() {
 	if w.z.matchLength > w.len {
 		w.z.matchLength = w.len
 	}
-	if w.z.matchLength <= _THRESHOLD {
+	if w.z.matchLength <= _Threshold {
 		w.z.matchLength = 1
 		w.encodeChar(uint(w.z.textBuf[w.r]))
 	} else {
-		w.encodeChar(uint(255 - _THRESHOLD + w.z.matchLength))
+		w.encodeChar(uint(255 - _Threshold + w.z.matchLength))
 		w.encodePosition(uint(w.z.matchPosition))
 	}
 
@@ -195,7 +195,7 @@ func (w *Writer) encodePosition(c uint) {
 
 	// output upper 6 bits by table lookup
 	i = c >> 6
-	w.putCode(int(p_len[i]), uint(p_code[i])<<8)
+	w.putCode(int(pLen[i]), uint(pCode[i])<<8)
 
 	// output lower 6 bits verbatim
 	w.putCode(6, (c&0x3f)<<10)

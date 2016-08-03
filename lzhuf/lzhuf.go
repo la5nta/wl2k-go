@@ -9,15 +9,14 @@ package lzhuf
 
 const (
 	// LZHUF variables
-	_N         = 2048 // Buffer size
-	_F         = 60   // Lookahead buffer size
-	_NIL       = _N   // Leaf of tree
-	_THRESHOLD = 2
-	_N_CHAR    = 256 - _THRESHOLD + _F // Kinds of characters (character code = 0..N_CHAR-1)
-	_T         = (_N_CHAR * 2) - 1     // Size of table
+	_N         = 2048                  // Buffer size
+	_F         = 60                    // Lookahead buffer size
+	_NIL       = _N                    // Leaf of tree
+	_NumChar   = 256 - _Threshold + _F // Kinds of characters (character code = 0..N_CHAR-1)
+	_T         = (_NumChar * 2) - 1     // Size of table
 	_R         = _T - 1                // Position of root
-	_MAX_FREQ  = 0x8000                // Updates tree when the
-
+	_MaxFreq   = 0x8000                // Updates tree when the
+	_Threshold = 2
 )
 
 type lzhuf struct {
@@ -28,7 +27,7 @@ type lzhuf struct {
 	//
 	// Expect for the elements [T..T+N_CHAR-1] which are
 	// used to get the positions of leaves corresponding to the codes.
-	prnt [_T + _N_CHAR]int
+	prnt [_T + _NumChar]int
 
 	// Pointers to child nodes.
 	son [_T]int
@@ -55,13 +54,13 @@ func (z *lzhuf) InitTree() {
 func newLZHUFF() *lzhuf {
 	z := new(lzhuf)
 
-	for i := 0; i < _N_CHAR; i++ {
+	for i := 0; i < _NumChar; i++ {
 		z.freq[i] = 1
 		z.son[i] = i + _T
 		z.prnt[i+_T] = i
 	}
 
-	for i, j := 0, _N_CHAR; j <= _R; {
+	for i, j := 0, _NumChar; j <= _R; {
 		z.freq[j] = z.freq[i] + z.freq[i+1]
 		z.son[j] = i
 		z.prnt[i] = j
@@ -147,7 +146,7 @@ func (z *lzhuf) InsertNode(r int) {
 				break
 			}
 		}
-		if i > _THRESHOLD {
+		if i > _Threshold {
 			if i > z.matchLength {
 				z.matchPosition = ((r - p) & (_N - 1)) - 1
 				z.matchLength = i
@@ -187,7 +186,7 @@ func (z *lzhuf) reconst() {
 	}
 
 	// Begin constructing tree by connecting children nodes
-	for i, j := 0, _N_CHAR; j < _T; i, j = i+2, j+1 {
+	for i, j := 0, _NumChar; j < _T; i, j = i+2, j+1 {
 		k := i + 1
 		z.freq[j] = z.freq[i] + z.freq[k]
 
@@ -218,7 +217,7 @@ func (z *lzhuf) reconst() {
 }
 
 func (z *lzhuf) update(c int) {
-	if z.freq[_R] == _MAX_FREQ {
+	if z.freq[_R] == _MaxFreq {
 		z.reconst()
 	}
 
@@ -270,7 +269,7 @@ func (z *lzhuf) update(c int) {
  */
 
 // for encoding
-var p_code = [64]byte{
+var pCode = [64]byte{
 	0x00, 0x20, 0x30, 0x40, 0x50, 0x58, 0x60, 0x68,
 	0x70, 0x78, 0x80, 0x88, 0x90, 0x94, 0x98, 0x9C,
 	0xA0, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC,
@@ -280,7 +279,7 @@ var p_code = [64]byte{
 	0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7,
 	0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
 }
-var p_len = [64]byte{
+var pLen = [64]byte{
 	0x03, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05,
 	0x05, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06, 0x06,
 	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
@@ -292,7 +291,7 @@ var p_len = [64]byte{
 }
 
 // for decoding
-var d_code = [256]byte{
+var dCode = [256]byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -326,7 +325,7 @@ var d_code = [256]byte{
 	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
 	0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
 }
-var d_len = [256]byte{
+var dLen = [256]byte{
 	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
 	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
 	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
