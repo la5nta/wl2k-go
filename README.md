@@ -1,3 +1,4 @@
+[![GoDoc](https://godoc.org/github.com/la5nta/wl2k-go?status.svg)](http://godoc.org/github.com/la5nta/wl2k-go)
 [![Build Status](https://travis-ci.org/la5nta/wl2k-go.svg?branch=master)](https://travis-ci.org/la5nta/wl2k-go)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/j76on3km4vy5vsq0/branch/master?svg=true)](https://ci.appveyor.com/project/martinhpedersen/wl2k-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/la5nta/wl2k-go)](https://goreportcard.com/report/github.com/la5nta/wl2k-go)
