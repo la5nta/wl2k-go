@@ -23,7 +23,7 @@ func TestRoundtrip(t *testing.T) {
 	}
 
 	for _, fi := range files {
-		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" {
+		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" || fi.Name()[0] == '.' {
 			continue
 		}
 
@@ -149,7 +149,7 @@ func TestWriterTestdata(t *testing.T) {
 	}
 
 	for _, fi := range files {
-		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" {
+		if fi.IsDir() || filepath.Ext(fi.Name()) == ".lzh" || fi.Name()[0] == '.' {
 			continue
 		}
 
