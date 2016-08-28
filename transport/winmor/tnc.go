@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/la5nta/wl2k-go/transport"
 )
 
 var (
@@ -38,7 +40,7 @@ type TNC struct {
 
 	selfClose bool
 
-	ptt PTT
+	ptt transport.PTTController
 
 	heard map[string]time.Time
 
@@ -108,9 +110,7 @@ func (tnc *TNC) Heard() map[string]time.Time {
 // Set the PTT that should be controlled by the TNC.
 //
 // If nil, the PTT request from the TNC is ignored.
-func (tnc *TNC) SetPTT(ptt PTT) {
-	tnc.ptt = ptt
-}
+func (tnc *TNC) SetPTT(ptt transport.PTTController) { tnc.ptt = ptt }
 
 func (tnc *TNC) init() (err error) {
 	if tnc.state = tnc.getState(); tnc.state == Offline {

@@ -28,7 +28,7 @@ type BusyChannelChecker interface {
 }
 
 type PTTController interface {
-	SetPTT(on bool)
+	SetPTT(on bool) error
 }
 
 // Dialer is implemented by transports that supports dialing a transport.URL.

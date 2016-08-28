@@ -11,10 +11,6 @@ import (
 	"strings"
 )
 
-type PTT interface {
-	SetPTT(on bool) error
-}
-
 type State uint8
 
 // The default address Winmor TNC listens on
