@@ -23,6 +23,7 @@ type tncConn struct {
 	dataIn   <-chan []byte
 	eofChan  chan struct{}
 	ctrlIn   broadcaster
+	doCRC    bool
 
 	remoteAddr Addr
 	localAddr  Addr
@@ -71,6 +72,7 @@ func (conn *tncConn) Write(p []byte) (int, error) {
 	conn.dataLock.Lock()
 	defer conn.dataLock.Unlock()
 
+	//TODO: Consider implementing chunking
 	if len(p) > 65535 { // uint16 (length bytes) max
 		p = p[:65535]
 	}
@@ -89,8 +91,10 @@ func (conn *tncConn) Write(p []byte) (int, error) {
 	n, _ := buf.Write(p)
 
 	// 2 byte CRC
-	sum := crc16Sum(buf.Bytes()[2:]) // [2:], don't include D: in CRC sum.
-	binary.Write(&buf, binary.BigEndian, sum)
+	if conn.doCRC {
+		sum := crc16Sum(buf.Bytes()[2:]) // [2:], don't include D: in CRC sum.
+		binary.Write(&buf, binary.BigEndian, sum)
+	}
 
 	r := conn.ctrlIn.Listen()
 	defer r.Close()

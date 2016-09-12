@@ -100,6 +100,7 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 						ctrlIn:     tnc.in,
 						dataIn:     tnc.dataIn,
 						eofChan:    make(chan struct{}),
+						doCRC:      tnc.doCRC,
 					}
 
 					tnc.connected = true

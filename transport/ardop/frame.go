@@ -29,17 +29,19 @@ type cmdFrame string
 
 func (f cmdFrame) Parsed() ctrlMsg { return parseCtrlMsg(string(f)) }
 
-func writeCtrlFrame(w io.Writer, format string, params ...interface{}) error {
+func writeCtrlFrame(crc16 bool, w io.Writer, format string, params ...interface{}) error {
 	payload := fmt.Sprintf(format+"\r", params...)
-	if _, err := fmt.Fprint(w, "C:"+payload); err != nil {
-		return err
+	_, err := fmt.Fprint(w, "C:"+payload)
+
+	if crc16 && err == nil {
+		sum := crc16Sum([]byte(payload))
+		err = binary.Write(w, binary.BigEndian, sum)
 	}
 
-	sum := crc16Sum([]byte(payload))
-	return binary.Write(w, binary.BigEndian, sum)
+	return err
 }
 
-func readFrame(reader *bufio.Reader) (frame, error) {
+func readFrame(reader *bufio.Reader, crc16 bool) (frame, error) {
 	fType, err := reader.ReadByte()
 	if err != nil {
 		return nil, err
@@ -75,11 +77,13 @@ func readFrame(reader *bufio.Reader) (frame, error) {
 	}
 
 	// Verify CRC sums
-	sumBytes := make([]byte, 2)
-	reader.Read(sumBytes)
-	crc := binary.BigEndian.Uint16(sumBytes)
-	if crc16Sum(data) != crc {
-		return nil, ErrChecksumMismatch
+	if crc16 {
+		sumBytes := make([]byte, 2)
+		reader.Read(sumBytes)
+		crc := binary.BigEndian.Uint16(sumBytes)
+		if crc16Sum(data) != crc {
+			return nil, ErrChecksumMismatch
+		}
 	}
 
 	switch fType {

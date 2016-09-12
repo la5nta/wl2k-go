@@ -19,7 +19,9 @@ import (
 )
 
 type TNC struct {
-	ctrl io.ReadWriteCloser
+	ctrl     io.ReadWriteCloser
+	dataConn *net.TCPConn
+
 	data *tncConn
 
 	in      broadcaster
@@ -36,6 +38,9 @@ type TNC struct {
 
 	ptt transport.PTTController
 
+	// CRC checksum of frames is not used over TCP, but may be required in future serial implementations
+	doCRC bool
+
 	connected      bool
 	listenerActive bool
 	closed         bool
@@ -43,48 +48,65 @@ type TNC struct {
 
 // OpenTCP opens and initializes an ardop TNC over TCP.
 func OpenTCP(addr string, mycall, gridSquare string) (*TNC, error) {
-	tcpConn, err := net.Dial(`tcp`, addr)
+	ctrlConn, err := net.Dial(`tcp`, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	return Open(tcpConn, mycall, gridSquare)
-}
-
-// OpenTCP opens and initializes an ardop TNC.
-func Open(conn io.ReadWriteCloser, mycall, gridSquare string) (*TNC, error) {
-	var err error
-
-	tnc := &TNC{
-		in:     newBroadcaster(),
-		dataIn: make(chan []byte, 4096),
-		ctrl:   conn,
-		heard:  make(map[string]time.Time),
+	dataAddr := string(append([]byte(addr[:len(addr)-1]), addr[len(addr)-1]+1)) // Oh no he didn't!
+	raddr, _ := net.ResolveTCPAddr("tcp", dataAddr)
+	dataConn, err := net.DialTCP(`tcp`, nil, raddr)
+	if err != nil {
+		return nil, err
 	}
 
+	tnc := newTNC(ctrlConn, dataConn)
+	tnc.doCRC = false
+
+	return tnc, open(tnc, mycall, gridSquare)
+}
+
+func newTNC(ctrl io.ReadWriteCloser, dataConn *net.TCPConn) *TNC {
+	return &TNC{
+		in:       newBroadcaster(),
+		dataIn:   make(chan []byte, 4096),
+		ctrl:     ctrl,
+		dataConn: dataConn,
+		heard:    make(map[string]time.Time),
+		doCRC:    false,
+	}
+}
+
+// Open opens and initializes an ardop TNC.
+func Open(ctrl io.ReadWriteCloser, mycall, gridSquare string) (*TNC, error) {
+	tnc := newTNC(ctrl, nil)
+	return tnc, open(tnc, mycall, gridSquare)
+}
+
+func open(tnc *TNC, mycall, gridSquare string) error {
 	if err := tnc.runControlLoop(); err == io.EOF {
-		return nil, ErrBusy
+		return ErrBusy
 	} else if err != nil {
-		return nil, err
+		return err
 	}
 
 	runtime.SetFinalizer(tnc, (*TNC).Close)
 
 	if err := tnc.init(); err == io.EOF {
-		return nil, ErrBusy
+		return ErrBusy
 	} else if err != nil {
-		return nil, fmt.Errorf("Failed to initialize TNC: %s", err)
+		return fmt.Errorf("Failed to initialize TNC: %s", err)
 	}
 
-	if err = tnc.SetMycall(mycall); err != nil {
-		return nil, fmt.Errorf("Set my call failed: %s", err)
+	if err := tnc.SetMycall(mycall); err != nil {
+		return fmt.Errorf("Set my call failed: %s", err)
 	}
 
-	if err = tnc.SetGridSquare(gridSquare); err != nil {
-		return nil, fmt.Errorf("Set grid square failed: %s", err)
+	if err := tnc.SetGridSquare(gridSquare); err != nil {
+		return fmt.Errorf("Set grid square failed: %s", err)
 	}
 
-	return tnc, nil
+	return nil
 }
 
 // Set the PTT that should be controlled by the TNC.
@@ -127,6 +149,21 @@ func (tnc *TNC) init() (err error) {
 	return nil
 }
 
+func decodeTNCSteam(rd *bufio.Reader, doCRC bool, frames chan<- frame, errors chan<- error) {
+	for {
+		frame, err := readFrame(rd, doCRC)
+		if err != nil {
+			errors <- err
+		} else {
+			frames <- frame
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+}
+
 func (tnc *TNC) runControlLoop() error {
 	rd := bufio.NewReader(tnc.ctrl)
 
@@ -135,7 +172,7 @@ func (tnc *TNC) runControlLoop() error {
 		tcpConn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	}
 
-	if f, err := readFrame(rd); err != nil {
+	if f, err := readFrame(rd, false); err != nil {
 		return err
 	} else if cf, _ := f.(cmdFrame); cf != "RDY" {
 		return fmt.Errorf("Unexpected TNC prompt")
@@ -145,13 +182,26 @@ func (tnc *TNC) runControlLoop() error {
 		tcpConn.SetReadDeadline(time.Time{})
 	}
 
+	// Multiplex the possible TNC->HOST streams (TCP needs two streams) into a single channel of frames
+	frames := make(chan frame)
+	errors := make(chan error)
+	go decodeTNCSteam(rd, tnc.doCRC, frames, errors)
+	if tnc.dataConn != nil {
+		go decodeTNCSteam(bufio.NewReader(tnc.dataConn), tnc.doCRC, frames, errors)
+	}
+
 	go func() {
 		for { // Handle incoming TNC data
-			frame, err := readFrame(rd)
+			var frame frame
+			var err error
+			select {
+			case frame = <-frames:
+			case err = <-errors:
+			}
+
 			if err == io.EOF {
 				break
-			}
-			if err != nil {
+			} else if err != nil {
 				if debugEnabled() {
 					log.Printf("Error reading frame: %s", err)
 				}
@@ -242,7 +292,7 @@ func (tnc *TNC) runControlLoop() error {
 					log.Println("-->", str)
 				}
 
-				if err := writeCtrlFrame(tnc.ctrl, str); err != nil {
+				if err := writeCtrlFrame(tnc.doCRC, tnc.ctrl, str); err != nil {
 					if debugEnabled() {
 						log.Println(err)
 					}
@@ -253,8 +303,15 @@ func (tnc *TNC) runControlLoop() error {
 					return
 				}
 
-				if _, err := tnc.ctrl.Write(data); err != nil {
-					panic(err)
+				var err error
+				if tnc.dataConn != nil {
+					_, err = tnc.dataConn.Write(data)
+				} else {
+					_, err = tnc.ctrl.Write(data)
+				}
+
+				if err != nil {
+					panic(err) //FIXME
 				}
 			}
 		}
@@ -460,7 +517,7 @@ func (tnc *TNC) Disconnect() error {
 			return nil
 		}
 	}
-	panic("not possible")
+	return ErrTNCClosed
 }
 
 // Idle returns true if the TNC is not in a connecting or connected state.
@@ -504,7 +561,7 @@ func (tnc *TNC) arqCall(targetcall string, repeat int) error {
 			return nil
 		}
 	}
-	return nil
+	return ErrTNCClosed
 }
 
 func (tnc *TNC) set(cmd command, param interface{}) (err error) {
@@ -528,7 +585,7 @@ func (tnc *TNC) set(cmd command, param interface{}) (err error) {
 			return errors.New(msg.String())
 		}
 	}
-	return errors.New("TNC hung up")
+	return ErrTNCClosed
 }
 
 func (tnc *TNC) getString(cmd command) (string, error) {
@@ -573,5 +630,5 @@ func (tnc *TNC) get(cmd command) (value interface{}, err error) {
 			return
 		}
 	}
-	return nil, errors.New("TNC hung up")
+	return nil, ErrTNCClosed
 }
