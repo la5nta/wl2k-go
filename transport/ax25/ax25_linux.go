@@ -7,7 +7,6 @@
 package ax25
 
 /*
-#cgo LDFLAGS: -lax25
 #include <sys/socket.h>
 #include <netax25/ax25.h>
 #include <netax25/axlib.h>
