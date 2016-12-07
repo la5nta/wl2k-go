@@ -5,9 +5,11 @@
 package fbb
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 	"time"
+	"unicode"
 )
 
 func TestParseDate(t *testing.T) {
@@ -47,4 +49,50 @@ func TestAddressFromString(t *testing.T) {
 			t.Errorf("'%s' got %#v expected %#v", str, got, expect)
 		}
 	}
+}
+
+func TestEncodeNonASCIIFileNames(t *testing.T) {
+	msg := NewMessage(Private, "NOCALL")
+	msg.AddFile(NewFile("æøå.txt", []byte{}))
+
+	if h := msg.Header.Get("File"); IsIllegalHeader(h) {
+		t.Error("Non-ascii character in encoded File header")
+	}
+}
+
+func TestDecodeNonASCIIFileNames(t *testing.T) {
+	msg := NewMessage(Private, "NOCALL")
+	msg.AddFile(NewFile("æøå.txt", []byte{}))
+
+	samples := []string{
+		msg.Header["File"][0], // Word encoded (round trip)
+		"0 æøå.txt",           // UTF8
+		"0 \xE6\xF8\xE5.txt",  // Latin1
+	}
+
+	for i, v := range samples {
+		msg.Header["File"][0] = v
+
+		var buf bytes.Buffer
+		msg.Write(&buf)
+
+		decoded := new(Message)
+		decoded.ReadFrom(&buf)
+		if msg.Files()[0].Name() != "æøå.txt" {
+			t.Errorf("Sample %d failed", i)
+		}
+	}
+}
+
+func IsIllegalHeader(str string) bool {
+	for _, c := range str {
+		if !IsGraphicASCII(c) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsGraphicASCII(c rune) bool {
+	return c <= unicode.MaxASCII && unicode.IsGraphic(c)
 }

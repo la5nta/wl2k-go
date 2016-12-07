@@ -268,6 +268,7 @@ func (m *Message) ReadFrom(r io.Reader) error {
 
 	// Read files
 	m.files = make([]*File, len(m.Header[HEADER_FILE]))
+	dec := new(WordDecoder)
 	for i, value := range m.Header[HEADER_FILE] {
 		file := new(File)
 		m.files[i] = file
@@ -279,7 +280,9 @@ func (m *Message) ReadFrom(r io.Reader) error {
 		}
 
 		size, _ := strconv.Atoi(slice[0])
-		file.name = slice[1]
+
+		// The name part of this header may be utf8 encoded by Winlink Express. Use WordDecoder to be safe.
+		file.name, _ = dec.DecodeHeader(slice[1])
 
 		file.data, err = readSection(reader, size)
 		if err != nil {
@@ -362,9 +365,12 @@ func (m *Message) Receivers() []Address {
 func (m *Message) AddFile(f *File) {
 	m.files = append(m.files, f)
 
+	// According to spec, only ASCII is allowed.
+	encodedName, _ := toCharset(DefaultCharset, f.Name())
+	encodedName = mime.QEncoding.Encode(DefaultCharset, encodedName)
+
 	// Add header
-	value := fmt.Sprintf("%d %s", f.Size(), f.Name())
-	m.Header[HEADER_FILE] = append(m.Header[HEADER_FILE], value)
+	m.Header.Add(HEADER_FILE, fmt.Sprintf("%d %s", f.Size(), encodedName))
 }
 
 // Bytes returns the message in the Winlink Message format.
