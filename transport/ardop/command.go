@@ -16,7 +16,6 @@ const (
 	cmdPending         command = "PENDING"         // Indicates to the host application a Connect Request frame type has been detected (may not necessarily be to MYCALL or one of the MYAUX call signs). This provides an early warning to the host that a connection may be in process so it can hold any scanning activity.
 	cmdCancelPending   command = "CANCELPENDING"   // Indicates to the host that the prior PENDING Connect Request was not to MYCALL or one of the MYAUX call signs) This allows the Host to resume scanning.
 	cmdCRCFault        command = "CRCFAULT"        // Prompt to resend last frame
-	cmdReady           command = "RDY"             // Prompt
 	cmdAbort           command = "ABORT"           // Immediately aborts an ARQ Connection or a FEC Send session
 	cmdARQBW           command = "ARQBW"           // <200MAX|500MAX|1000MAX|2000MAX|200FORCED|500FORCED|1000FORCED|2000FORCED>
 	cmdARQTimeout      command = "ARQTIMEOUT"      // ARQTIMEOUT<30-240> Set/get the ARQ Timeout in seconds
@@ -120,13 +119,21 @@ func parseCtrlMsg(str string) ctrlMsg {
 		cmd: command(parts[0]),
 	}
 
+	isEchoBack := len(parts) > 1 && strings.HasPrefix(strings.ToLower(parts[1]), "now ")
+	if isEchoBack {
+		parts[1] = parts[1][len("now "):]
+	}
+
 	switch msg.cmd {
 	// bool
 	case cmdCodec, cmdPTT, cmdBusy, cmdTwoToneTest, cmdCWID, cmdListen, cmdAutoBreak:
 		msg.value = strings.ToLower(parts[1]) == "true"
 
 	// (no params)
-	case cmdReady, cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID:
+	case cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID:
+
+	// (echo-back only)
+	case cmdInitialize, cmdARQCall, cmdARQBW, cmdProtocolMode:
 
 	// State
 	case cmdNewState, cmdState:
@@ -141,7 +148,7 @@ func parseCtrlMsg(str string) ctrlMsg {
 	case cmdConnected:
 		msg.value = parseList(parts[1], " ")
 
-		// []string (comma separated)
+	// []string (comma separated)
 	case cmdCaptureDevices, cmdPlaybackDevices, cmdMyAux:
 		msg.value = parseList(parts[1], ",")
 

@@ -106,14 +106,13 @@ L:
 		}
 
 		conn.dataOut <- buf.Bytes()
+		conn.mu.Lock()
+		conn.nWritten += n
+		conn.mu.Unlock()
 		for {
 			select {
 			case msg := <-r.Msgs():
-				if msg.cmd == cmdReady {
-					conn.mu.Lock()
-					conn.nWritten += n
-					conn.mu.Unlock()
-				} else if msg.cmd == cmdBuffer {
+				if msg.cmd == cmdBuffer {
 					conn.flushLock.Lock()
 					break L // Wait until we get a buffer update before returning
 				} else if msg.cmd == cmdCRCFault {
@@ -180,9 +179,6 @@ func (conn *tncConn) Close() error {
 				return errors.New("TNC hung up while waiting for requested disconnect")
 			}
 
-			if msg.cmd == cmdReady {
-				// The command echo
-			}
 			if msg.cmd == cmdDisconnected || (msg.cmd == cmdNewState && msg.State() == Disconnected) {
 				// The control loop have already closed the data connection
 				return nil

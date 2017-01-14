@@ -167,21 +167,6 @@ func decodeTNCSteam(rd *bufio.Reader, doCRC bool, frames chan<- frame, errors ch
 func (tnc *TNC) runControlLoop() error {
 	rd := bufio.NewReader(tnc.ctrl)
 
-	// Read prompt so we know the TNC is ready
-	if tcpConn, ok := tnc.ctrl.(net.Conn); ok {
-		tcpConn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	}
-
-	if f, err := readFrame(rd, false); err != nil {
-		return err
-	} else if cf, _ := f.(cmdFrame); cf != "RDY" {
-		return fmt.Errorf("Unexpected TNC prompt")
-	}
-
-	if tcpConn, ok := tnc.ctrl.(net.Conn); ok {
-		tcpConn.SetReadDeadline(time.Time{})
-	}
-
 	// Multiplex the possible TNC->HOST streams (TCP needs two streams) into a single channel of frames
 	frames := make(chan frame)
 	errors := make(chan error)
@@ -234,16 +219,10 @@ func (tnc *TNC) runControlLoop() error {
 
 			line, ok := frame.(cmdFrame)
 			if !ok {
-				tnc.out <- string(cmdReady) // CRC ok
 				continue
 			}
 
 			msg := line.Parsed()
-
-			if msg.cmd != cmdReady {
-				tnc.out <- string(cmdReady) // CRC ok
-			}
-
 			switch msg.cmd {
 			case cmdPTT:
 				if tnc.ptt != nil {
@@ -579,7 +558,7 @@ func (tnc *TNC) set(cmd command, param interface{}) (err error) {
 	}
 
 	for msg := range r.Msgs() {
-		if msg.cmd == cmdReady {
+		if msg.cmd == cmd {
 			return
 		} else if msg.cmd == cmdFault {
 			return errors.New(msg.String())
@@ -612,7 +591,7 @@ func (tnc *TNC) getInt(cmd command) (int, error) {
 	return v.(int), nil
 }
 
-func (tnc *TNC) get(cmd command) (value interface{}, err error) {
+func (tnc *TNC) get(cmd command) (interface{}, error) {
 	if tnc.closed {
 		return nil, ErrTNCClosed
 	}
@@ -622,12 +601,11 @@ func (tnc *TNC) get(cmd command) (value interface{}, err error) {
 
 	tnc.out <- string(cmd)
 	for msg := range r.Msgs() {
-		if msg.cmd == cmd {
-			value = msg.value
-		} else if msg.cmd == cmdFault {
-			err = errors.New(msg.String())
-		} else if msg.cmd == cmdReady {
-			return
+		switch msg.cmd {
+		case cmd:
+			return msg.value, nil
+		case cmdFault:
+			return nil, errors.New(msg.String())
 		}
 	}
 	return nil, ErrTNCClosed

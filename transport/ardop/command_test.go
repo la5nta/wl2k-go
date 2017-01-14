@@ -17,7 +17,6 @@ func TestParse(t *testing.T) {
 		"PTT trUE":                          ctrlMsg{cmdPTT, true},
 		"CODEC True":                        ctrlMsg{cmdCodec, true},
 		"foobar baz":                        ctrlMsg{command("FOOBAR"), nil},
-		"RDY":                               ctrlMsg{cmdReady, nil},
 		"DISCONNECTED":                      ctrlMsg{cmdDisconnected, nil},
 		"FAULT 5/Error in the application.": ctrlMsg{cmdFault, "5/Error in the application."},
 		"BUFFER 300":                        ctrlMsg{cmdBuffer, 300},
