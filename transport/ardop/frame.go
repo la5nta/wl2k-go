@@ -97,8 +97,8 @@ func readFrame(reader *bufio.Reader, crc16 bool) (frame, error) {
 	}
 }
 
-// Data example: "ID:LA5NTA [JP20qe]: "
-var reID = regexp.MustCompile(`ID:(\w+) \[(\w+)\]`)
+// Data example: "ID LA5NTA:[JP20qe]"
+var reID = regexp.MustCompile(`ID (\w+):\[(\w+)\]`)
 
 func parseIDFrame(df dFrame) (callsign, gridsquare string, err error) {
 	if !df.IDFrame() {
