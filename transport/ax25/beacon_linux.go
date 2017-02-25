@@ -18,7 +18,7 @@ import (
 )
 
 func NewAX25Beacon(axPort, mycall, dest, message string) (Beacon, error) {
-	if _, err := loadPorts(); err != nil {
+	if err := checkPort(axPort); err != nil {
 		return nil, err
 	}
 

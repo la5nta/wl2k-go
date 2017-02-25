@@ -33,6 +33,7 @@ var numAXPorts int
 // bug(martinhpedersen): The AX.25 stack does not support SOCK_STREAM, so any write to the connection
 // that is larger than maximum packet length will fail. The b2f impl. requires 125 bytes long packets.
 var ErrMessageTooLong = errors.New("Write: Message too long. Consider increasing maximum packet length to >= 125.")
+var ErrPortNotExist = errors.New("No such AX port found")
 
 type fd uintptr
 
@@ -40,6 +41,8 @@ type ax25Listener struct {
 	sock      fd
 	localAddr AX25Addr
 }
+
+func portExists(port string) bool { return C.ax25_config_get_dev(C.CString(port)) != nil }
 
 func loadPorts() (int, error) {
 	if numAXPorts > 0 {
@@ -55,6 +58,19 @@ func loadPorts() (int, error) {
 
 	numAXPorts = int(n)
 	return numAXPorts, err
+}
+
+func checkPort(axPort string) error {
+	if axPort == "" {
+		return errors.New("Invalid empty axport")
+	}
+	if _, err := loadPorts(); err != nil {
+		return err
+	}
+	if !portExists(axPort) {
+		return ErrPortNotExist
+	}
+	return nil
 }
 
 // Addr returns the listener's network address, an AX25Addr.
@@ -85,11 +101,7 @@ func (ln ax25Listener) Accept() (net.Conn, error) {
 //
 // An error will be returned if axPort is empty.
 func ListenAX25(axPort, mycall string) (net.Listener, error) {
-	if axPort == "" {
-		return nil, errors.New("Invalid empty axport")
-	}
-
-	if _, err := loadPorts(); err != nil {
+	if err := checkPort(axPort); err != nil {
 		return nil, err
 	}
 
@@ -122,11 +134,7 @@ func ListenAX25(axPort, mycall string) (net.Listener, error) {
 
 // DialAX25Timeout acts like DialAX25 but takes a timeout.
 func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (*Conn, error) {
-	if axPort == "" {
-		return nil, errors.New("Invalid empty axport")
-	}
-
-	if _, err := loadPorts(); err != nil {
+	if err := checkPort(axPort); err != nil {
 		return nil, err
 	}
 
