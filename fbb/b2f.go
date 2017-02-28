@@ -525,23 +525,30 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	// the raw subject header here, we need to handle this by decoding it the same way as the subject header.
 	p.title, _ = new(WordDecoder).DecodeHeader(title)
 
-	var offset string
-	if offset, err = s.rd.ReadString(_CHRNUL); err != nil {
+	// Read offset part
+	var offsetStr string
+	if offsetStr, err = s.rd.ReadString(_CHRNUL); err != nil {
 		return errors.New(`Unable to parse offset: ` + err.Error())
 	} else {
-		offset = offset[:len(offset)-1]
+		offsetStr = offsetStr[:len(offsetStr)-1]
 	}
 
-	actualHeaderLength := (len(title) + len(offset)) + 2
+	// Check overall length of header
+	actualHeaderLength := (len(title) + len(offsetStr)) + 2
 	if headerLength != actualHeaderLength {
 		return errors.New(fmt.Sprintf(`Header length mismatch: expected %d, got %d`, headerLength, actualHeaderLength))
 	}
 
-	if offset != `0` {
-		return errors.New(fmt.Sprintf(`Expected offset 0, got %s (%d)`, offset, len(offset)))
+	// Parse offset as integer (and do some sanity checks)
+	offset, err := strconv.Atoi(offsetStr)
+	switch {
+	case err != nil:
+		return fmt.Errorf("Offset header not parseable as integer: %s", err)
+	case offset != p.offset:
+		return fmt.Errorf(`Expected offset %d, got %d`, p.offset, offset)
 	}
 
-	s.log.Printf("Receiving [%s] [offset %s]", p.title, offset)
+	s.log.Printf("Receiving [%s] [offset %d]", p.title, p.offset)
 
 	if p.code == GzipProposal {
 		s.log.Println("GZIP_EXPERIMENT:", "Receiving gzip compressed message.")
