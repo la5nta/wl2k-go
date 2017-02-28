@@ -564,7 +564,7 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 		}
 		c, err = s.rd.ReadByte()
 		if err != nil {
-			return errors.New(`ReadByte failed after header: ` + err.Error())
+			return err
 		}
 
 		switch c {
