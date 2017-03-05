@@ -25,6 +25,7 @@ func TestParse(t *testing.T) {
 		"MYAUX LA5NTA,LE3OF":                ctrlMsg{cmdMyAux, []string{"LA5NTA", "LE3OF"}},
 		"MYAUX LA5NTA, LE3OF":               ctrlMsg{cmdMyAux, []string{"LA5NTA", "LE3OF"}},
 		"VERSION 1.4.7.0":                   ctrlMsg{cmdVersion, "1.4.7.0"},
+		"FREQUENCY 14096400":                ctrlMsg{cmdFrequency, 14096400},
 	}
 	for input, expected := range tests {
 		got := parseCtrlMsg(input)

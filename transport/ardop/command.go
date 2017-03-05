@@ -48,6 +48,7 @@ const (
 	cmdPlaybackDevices command = "PLAYBACKDEVICES" // Returns a comma delimited list of all currently installed playback devices.
 	cmdAutoBreak       command = "AUTOBREAK"       // <>[bool]: Disables/enables automatic link turnover (BREAK) by IRS when IRS has outbound data pending and receives an IDLE frame from ISS indicating its’ outbound queue is empty. Default is True.
 	cmdSendID          command = "SENDID"
+	cmdFrequency       command = "FREQUENCY" // <Frequency in Hz>  If TNC Radio control is enabled the FREQUENCY command is sent to the Host upon a change in frequency of the radio. The frequency reported is the DIAL frequency of the radio.
 
 	// Some of the commands that has not been implemented:
 	cmdBreak         command = "BREAK"
@@ -153,10 +154,10 @@ func parseCtrlMsg(str string) ctrlMsg {
 		msg.value = parseList(parts[1], ",")
 
 	// int
-	case cmdDriveLevel, cmdBuffer, cmdARQTimeout:
+	case cmdDriveLevel, cmdBuffer, cmdARQTimeout, cmdFrequency:
 		i, err := strconv.Atoi(parts[1])
 		if err != nil {
-			log.Printf("Failed to parse offset value: %s", err)
+			log.Printf("Failed to parse %s value: %s", msg.cmd, err)
 		}
 		msg.value = i
 
