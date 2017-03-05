@@ -225,14 +225,10 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 			continue
 		}
 
-		// Migrate to .b2f extension if we find a file that matches the old filenames.
-		//
-		// This should be removed after some time.
+		// Warn if we find a file that matches the old filename structure (TODO: Remove)
 		if isOldFilename(file.Name()) {
-			if err := migrateDir(dirPath); err != nil {
-				return nil, fmt.Errorf("Unable to migrate to new filenames: %s", err)
-			}
-			return LoadMessageDir(dirPath)
+			fmt.Fprintf(os.Stderr, "Mailbox: Ignoring message file with deprecated file name (%s). Fix manually by renaming the file to '%s'.\n", file.Name(), file.Name()+Ext)
+			continue
 		}
 
 		if !strings.EqualFold(filepath.Ext(file.Name()), Ext) {
@@ -254,30 +250,6 @@ func isOldFilename(str string) bool {
 		return false
 	}
 	return true
-}
-
-func migrateDir(dirPath string) error {
-	files, err := ioutil.ReadDir(dirPath)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if file.IsDir() || !isOldFilename(file.Name()) {
-			continue
-		}
-
-		err := os.Rename(
-			path.Join(dirPath, file.Name()),
-			path.Join(dirPath, file.Name()+Ext),
-		)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // OpenMessage opens a single a fbb.Message file.
