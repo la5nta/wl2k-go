@@ -121,6 +121,7 @@ type Status struct {
 	Sending          *Proposal
 	BytesTransferred int
 	BytesTotal       int
+	Done             bool
 	When             time.Time
 }
 

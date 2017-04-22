@@ -441,12 +441,14 @@ func (s *Session) writeCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 						Sending:          p,
 						BytesTransferred: p.compressedSize - buffer.Len(),
 						BytesTotal:       p.compressedSize,
+						Done:             true,
 					})
 				}
 				return
 			}
 		}
 	}()
+	defer func() { close(statusDone) }()
 
 	// Data (in chunks of max 250)
 	for buffer.Len() > 0 {
@@ -484,7 +486,6 @@ func (s *Session) writeCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	}
 
 	statusTicker.Stop()
-	close(statusDone)
 
 	return err
 }
@@ -554,14 +555,33 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 		s.log.Println("GZIP_EXPERIMENT:", "Receiving gzip compressed message.")
 	}
 
-	for {
-		if s.statusUpdater != nil {
-			go s.statusUpdater.UpdateStatus(Status{
-				Receiving:        p,
-				BytesTransferred: buf.Len(),
-				BytesTotal:       p.compressedSize,
-			})
+	statusUpdate := make(chan struct{})
+	go func() {
+		for {
+			_, ok := <-statusUpdate
+			if s.statusUpdater != nil {
+				s.statusUpdater.UpdateStatus(Status{
+					Receiving:        p,
+					BytesTransferred: buf.Len(),
+					BytesTotal:       p.compressedSize,
+					Done:             !ok,
+				})
+			}
+			if !ok {
+				return
+			}
 		}
+	}()
+	defer func() { close(statusUpdate) }()
+	updateStatus := func() {
+		select {
+		case statusUpdate <- struct{}{}:
+		default:
+		}
+	}
+
+	for {
+		updateStatus()
 		c, err = s.rd.ReadByte()
 		if err != nil {
 			return err
@@ -581,6 +601,9 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 				}
 				buf.WriteByte(c)
 				ourChecksum = (ourChecksum + int(c)) % 256
+				if i%10 == 0 {
+					updateStatus()
+				}
 			}
 		case _CHREOT:
 			c, _ = s.rd.ReadByte()
