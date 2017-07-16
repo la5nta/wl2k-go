@@ -79,7 +79,7 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 	// Handle session turnover
 	switch {
 	case len(sent) > 0:
-		// Turnover is emplied
+		// Turnover is implied
 	case s.remoteNoMsgs && len(sent) == 0:
 		s.pLog.Print(">FQ")
 		fmt.Fprint(rw, "FQ\r")
@@ -92,13 +92,13 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 
 	// Error reporting from remote is not defined by the protocol,
 	// but usually indicated by sending a line prefixed with '***'.
-	// The only valid byte (according to protocol) after a session
-	// turnover is 'F', so we use that to confirm the block was
-	// successfully received.
+	// The only valid bytes (according to protocol) after a session
+	// turnover is 'F' or ';', so we use those to confirm the block
+	// was successfully received.
 	var p []byte
 	if p, err = s.rd.Peek(1); err != nil {
 		return
-	} else if p[0] != 'F' {
+	} else if p[0] != 'F' && p[0] != ';' {
 		var line string
 		line, err = s.nextLine()
 		if err != nil {
@@ -108,13 +108,13 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 		return
 	}
 
+	// Report successfully sent messages
 	for mid, rej := range sent {
 		s.h.SetSent(mid, rej)
 		if !rej {
 			s.trafficStats.Sent = append(s.trafficStats.Sent, mid)
 		}
 	}
-
 	return
 }
 
@@ -148,11 +148,19 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 	s.log.Printf(`Sending checksum %02X`, checksum)
 	fmt.Fprintf(rw, "F> %02X\r", checksum)
 
-	reply, err := s.nextLine()
-	if err != nil {
-		return sent, err
-	} else if !strings.HasPrefix(reply, `FS `) {
-		return sent, fmt.Errorf("Expected proposal answer from remote. Got: '%s'", reply)
+	var reply string
+	for reply == "" {
+		line, err := s.nextLine()
+		switch {
+		case err != nil:
+			return sent, err
+		case strings.HasPrefix(line, "FS "):
+			reply = line // The expected proposal answer
+		case strings.HasPrefix(line, ";"):
+			continue // Ignore comment
+		default:
+			return sent, fmt.Errorf("Expected proposal answer from remote. Got: '%s'", reply)
+		}
 	}
 
 	if err = parseProposalAnswer(reply, outbound, s.log); err != nil {
@@ -181,7 +189,6 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 			sent[prop.mid] = false
 		}
 	}
-
 	return
 }
 
@@ -198,14 +205,18 @@ Loop:
 			return
 		}
 
-		if len(line) < 1 || line[0] == ';' { //REVIEW: Remove?
+		// Ignore comments and empty lines
+		if line == "" || line[0] == ';' {
 			continue
-		} else if line[0] != 'F' || len(line) < 2 {
+		}
+
+		// The line should be prefixed F? (? is the command character)
+		if len(line) < 2 || line[0] != 'F' {
 			return false, fmt.Errorf("Got unexpected protocol line: '%s'", line)
 		}
 
-		switch line[1] {
-		case 'A', 'B', 'C', 'D': // Proposal
+		switch line[:2] {
+		case "FA", "FB", "FC", "FD": // Proposals
 			for _, c := range line {
 				ourChecksum += int64(c)
 			}
@@ -218,14 +229,14 @@ Loop:
 			}
 			proposals = append(proposals, prop)
 
-		case 'F': // No more messages
+		case "FF": // No more messages
 			break Loop
 
-		case 'Q': // Quit
+		case "FQ": // Quit
 			quitReceived = true
 			break Loop
 
-		case '>': // Prompt (end of proposal block)
+		case "F>": // Prompt (end of proposal block)
 			// Verify checksum
 			ourChecksum = (-ourChecksum) & 0xff
 			their, _ := strconv.ParseInt(line[3:], 16, 64)
@@ -239,9 +250,8 @@ Loop:
 				return
 			}
 
-			s.log.Printf(`%d proposal(s) received`, len(proposals))
-
 			// Answer proposal
+			s.log.Printf(`%d proposal(s) received`, len(proposals))
 			nAccepted, err = s.writeProposalsAnswer(rw, proposals)
 			if err != nil {
 				return quitReceived, err

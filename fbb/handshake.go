@@ -89,7 +89,7 @@ func (s *Session) readHandshake() (handshakeData, error) {
 
 		//REVIEW: We should probably be more strict on what to allow here,
 		// to ensure we disconnect early if the remote is not talking the expected
-		// protocol.
+		// protocol. (We should at least allow unknown ; prefixed lines aka "comments")
 		switch {
 		case strings.Contains(line, `[`): // Header with sid (ie. [WL2K-2.8.4.8-B2FWIHJM$])
 			data.SID, err = parseSID(line)
@@ -101,20 +101,18 @@ func (s *Session) readHandshake() (handshakeData, error) {
 			if !data.SID.Has(sFBComp2) { // We require FBB compressed protocol v2 for now
 				return data, ErrNoFB2
 			}
-
-		// ; lines wl2k specific commands?
-		case strings.HasPrefix(line, ";FW"):
+		case strings.HasPrefix(line, ";FW"): // Forwarders
 			data.FW, err = parseFW(line)
 			if err != nil {
 				return data, err
 			}
-
-		case strings.HasPrefix(line, ";PQ"):
+		case strings.HasPrefix(line, ";PQ"): // Secure password challenge
 			data.SecureChallenge = line[5:]
-		}
 
-		if strings.HasSuffix(line, ">") {
+		case strings.HasSuffix(line, ">"): // Prompt
 			return data, nil
+		default:
+			// Ignore
 		}
 	}
 }

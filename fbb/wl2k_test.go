@@ -132,3 +132,58 @@ func TestSessionCMDWithMessage(t *testing.T) {
 		t.Errorf("Session exchange returned error: %s", err)
 	}
 }
+
+func TestSessionCMSv4(t *testing.T) {
+	client, srv := net.Pipe()
+
+	cerrs := make(chan error)
+	go func() {
+		s := NewSession("LA5NTA", "LA1B-10", "JO39EQ", nil)
+		_, err := s.Exchange(client)
+		cerrs <- err
+	}()
+
+	fmt.Fprint(srv, "[WL2K-4.0-B2FWIHJM$]\r")
+	fmt.Fprint(srv, "Test CMS >\r")
+
+	expectLines := []string{
+		";FW: LA5NTA\r",
+		"[wl2kgo-0.1a-B2FHM$]\r",
+		"; LA1B-10 DE LA5NTA (JO39EQ)\r",
+		"FF\r",
+	}
+
+	// Read until FF
+	rd := bufio.NewReader(srv)
+	for i, expected := range expectLines {
+		line, _ := rd.ReadString('\r')
+		if line != expected {
+			line, expected = strings.TrimSpace(line), strings.TrimSpace(expected)
+			t.Fatalf("Unexpected line [%d]: Got '%s', expected '%s'.", i, line, expected)
+		}
+	}
+
+	// Send some CMS v4 ; lines
+	fmt.Fprintf(srv, ";PM: LA5NTA TJKYEIMMHSRB 123 martin.h.pedersen@gmail.com\r")
+	fmt.Fprintf(srv, ";WARNING: Foo bar baz\r")
+
+	// Send one proposal
+	fmt.Fprintf(srv, "FC EM TJKYEIMMHSRB 527 123 0\r")
+	fmt.Fprintf(srv, "F> 3b\r") // No more proposals + checksum
+
+	propAnswer, _ := rd.ReadString('\r')
+	if propAnswer != "FS =\r" {
+		t.Errorf("Expected 'FS =', got '%s'", propAnswer)
+	}
+
+	fmt.Fprintf(srv, ";WARNING: Foo bar baz\r") // One more CMS v4 ; line
+	fmt.Fprintf(srv, "FF\r")                    // No more messages
+
+	if line, _ := rd.ReadString('\r'); line != "FQ\r" {
+		t.Errorf("Expected 'FQ', got '%s'", line)
+	}
+
+	if err := <-cerrs; err != nil {
+		t.Errorf("Session exchange returned error: %s", err)
+	}
+}
