@@ -40,6 +40,7 @@ type fd uintptr
 type ax25Listener struct {
 	sock      fd
 	localAddr AX25Addr
+	close     chan struct{}
 }
 
 func portExists(port string) bool { return C.ax25_config_get_dev(C.CString(port)) != nil }
@@ -77,12 +78,17 @@ func checkPort(axPort string) error {
 func (ln ax25Listener) Addr() net.Addr { return ln.localAddr }
 
 // Close stops listening on the AX.25 port. Already Accepted connections are not closed.
-func (ln ax25Listener) Close() error { return ln.sock.close() } //TODO: Should make sure any Accept() calls returns with an error!
+func (ln ax25Listener) Close() error { close(ln.close); return ln.sock.close() }
 
 // Accept waits for the next call and returns a generic Conn.
 //
 // See net.Listener for more information.
 func (ln ax25Listener) Accept() (net.Conn, error) {
+	err := ln.sock.waitRead(ln.close)
+	if err != nil {
+		return nil, err
+	}
+
 	nfd, addr, err := ln.sock.accept()
 	if err != nil {
 		return nil, err
@@ -129,6 +135,7 @@ func ListenAX25(axPort, mycall string) (net.Listener, error) {
 	return ax25Listener{
 		sock:      fd(socket),
 		localAddr: AX25Addr{localAddr},
+		close:     make(chan struct{}),
 	}, nil
 }
 
@@ -243,28 +250,15 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 		return err
 	}
 
-	// Shamelessly stolen from src/pkg/exp/inotify/inotify_linux.go:
-	//
-	// Create fdSet, taking into consideration that
-	// 64-bit OS uses Bits: [16]int64, while 32-bit OS uses Bits: [32]int32.
-	// This only support File Descriptors up to 1024
-	//
-	if sock > 1024 {
-		panic(fmt.Errorf("connectTimeout: File Descriptor >= 1024: %v", sock))
-	}
 	fdset := new(syscall.FdSet)
-	fElemSize := 32 * 32 / len(fdset.Bits)
-	fdset.Bits[int(sock)/fElemSize] |= 1 << uint(int(sock)%fElemSize)
-	//
-	// Thanks!
-	//
+	maxFd := fdSet(fdset, int(sock))
 
 	// Wait or timeout
 	var n int
 	var tv syscall.Timeval
 	for {
 		tv = syscall.NsecToTimeval(int64(timeout))
-		n, err = syscall.Select(int(sock)+1, nil, fdset, nil, &tv)
+		n, err = syscall.Select(maxFd+1, nil, fdset, nil, &tv)
 		if n < 0 && err != syscall.EINTR {
 			sock.close()
 			return err
@@ -292,13 +286,55 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 	return
 }
 
+// waitRead blocks until the socket is ready for read or the call is canceled
+//
+// The error syscall.EINVAL is returned if the cancel channel is closed, indicating
+// that the socket is being closed by another thread.
+func (sock fd) waitRead(cancel <-chan struct{}) error {
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			pw.Write([]byte("\n"))
+		case <-done:
+			return
+		}
+	}()
+	defer func() { close(done); pw.Close() }()
+
+	fdset := new(syscall.FdSet)
+	maxFd := fdSet(fdset, int(sock), int(pr.Fd()))
+
+	syscall.SetNonblock(int(sock), true)
+	defer func() { syscall.SetNonblock(int(sock), false) }()
+
+	var n int
+	for {
+		n, err = syscall.Select(maxFd+1, fdset, nil, nil, nil)
+		if n < 0 || err != nil {
+			return err
+		}
+
+		if fdIsSet(fdset, int(sock)) {
+			break // sock is ready for read
+		} else {
+			return syscall.EINVAL
+		}
+	}
+	return nil
+}
+
 func (sock fd) close() error {
 	return syscall.Close(int(sock))
 }
 
 func (sock fd) accept() (nfd fd, addr ax25Addr, err error) {
 	addrLen := C.socklen_t(unsafe.Sizeof(addr))
-
 	n, err := C.accept(
 		C.int(sock),
 		(*C.struct_sockaddr)(unsafe.Pointer(&addr)),
@@ -379,4 +415,30 @@ func newAX25Addr(address string) ax25Addr {
 	addr.fsa_ax25.sax25_family = syscall.AF_AX25
 
 	return ax25Addr(addr)
+}
+
+func fdSet(p *syscall.FdSet, fd ...int) (max int) {
+	// Shamelessly stolen from src/pkg/exp/inotify/inotify_linux.go:
+	//
+	// Create fdSet, taking into consideration that
+	// 64-bit OS uses Bits: [16]int64, while 32-bit OS uses Bits: [32]int32.
+	// This only support File Descriptors up to 1024
+	//
+	fElemSize := 32 * 32 / len(p.Bits)
+
+	for _, i := range fd {
+		if i > 1024 {
+			panic(fmt.Errorf("fdSet: File Descriptor >= 1024: %v", i))
+		}
+		if i > max {
+			max = i
+		}
+		p.Bits[i/fElemSize] |= 1 << uint(i%fElemSize)
+	}
+	return max
+}
+
+func fdIsSet(p *syscall.FdSet, i int) bool {
+	fElemSize := 32 * 32 / len(p.Bits)
+	return p.Bits[i/fElemSize]&(1<<uint(i%fElemSize)) != 0
 }
