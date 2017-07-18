@@ -122,8 +122,14 @@ func (s *Session) sendHandshake(writer io.Writer, secureResp string) error {
 
 	// Request messages on behalf of every localFW
 	fmt.Fprintf(w, ";FW:")
-	for _, addr := range s.localFW {
-		fmt.Fprintf(w, " %s", addr.Addr)
+	for i, addr := range s.localFW {
+		// Include passwordhash for auxiliary calls (required by WL2K-4.x or later)
+		if secureResp != "" && i > 0 {
+			//TODO: Add support for individual passwords
+			fmt.Fprintf(w, " %s|%s", addr.Addr, secureResp)
+		} else {
+			fmt.Fprintf(w, " %s", addr.Addr)
+		}
 	}
 	fmt.Fprintf(w, "\r")
 
@@ -152,6 +158,7 @@ func parseFW(line string) ([]Address, error) {
 	addrs := make([]Address, 0, len(fws))
 
 	for _, str := range strings.Split(line[5:], " ") {
+		str = strings.Split(str, "|")[0] // Strip password hashes (unsupported)
 		addrs = append(addrs, AddressFromString(str))
 	}
 
