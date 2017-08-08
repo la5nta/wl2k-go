@@ -355,10 +355,15 @@ func (s *Session) outbound() []*Proposal {
 	props := make([]*Proposal, 0, len(msgs))
 
 	for _, m := range msgs {
+		// It seems reasonable to ignore these with a warning
+		if err := m.Validate(); err != nil {
+			s.log.Printf("Ignoring invalid outbound message '%s': %s", m.MID(), err)
+			continue
+		}
+
 		prop, err := m.Proposal(s.highestPropCode())
 		if err != nil {
-			// TODO: This should result in an error somewhere
-			s.log.Printf("Unable to prepare proposal for '%s'. Corrupt message? Skipping...", prop.MID())
+			s.log.Printf("Unable to prepare proposal for '%s'. Corrupt message? Ignoring...", m.MID())
 			continue
 		}
 

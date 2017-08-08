@@ -372,13 +372,15 @@ func (m *Message) IsOnlyReceiver(addr Address) bool {
 }
 
 // Method for generating a proposal of the message.
+//
+// An error is returned if the Validate method fails.
 func (m *Message) Proposal(code PropCode) (*Proposal, error) {
 	data, err := m.Bytes()
 	if err != nil {
 		return nil, err
 	}
 
-	return NewProposal(m.MID(), m.Subject(), code, data), nil
+	return NewProposal(m.MID(), m.Subject(), code, data), m.Validate()
 }
 
 // Receivers returns a slice of all receivers of this message.
