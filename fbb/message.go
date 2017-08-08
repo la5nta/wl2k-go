@@ -108,6 +108,39 @@ func NewMessage(t MsgType, mycall string) *Message {
 	return msg
 }
 
+// Validate returns an error if this message violates any Winlink Message Structure constraints
+func (m *Message) Validate() error {
+	switch {
+	case m.MID() == "":
+		return fmt.Errorf("Empty MID")
+	case len(m.MID()) > 12:
+		return fmt.Errorf("MID too long")
+	case len(m.Receivers()) == 0:
+		// This is not documented, but the CMS refuses to accept such messages (with good reason)
+		return fmt.Errorf("No recipient")
+	case m.Header.Get(HEADER_FROM) == "":
+		return fmt.Errorf("Empty From field")
+	case m.BodySize() == 0:
+		return fmt.Errorf("Empty body")
+	case len(m.Header.Get(HEADER_SUBJECT)) == 0:
+		// This is not documented, but the CMS writes the proposal title if this is empty
+		// (which I guess is a compatibility hack on their end).
+		return fmt.Errorf("Empty subject")
+	case len(m.Header.Get(HEADER_SUBJECT)) > 128:
+		return fmt.Errorf("Subject too long")
+	}
+
+	// The CMS seems to except this, but according to the winlink.org/B2F document it is not allowed:
+	//  "... and the file name (up to 50 characters) of the original file."
+	for _, f := range m.Files() {
+		if len(f.Name()) > 50 {
+			return fmt.Errorf("Attachment file name too long: %s", f.Name)
+		}
+	}
+
+	return nil
+}
+
 // MID returns the unique identifier of this message across the winlink system.
 func (m *Message) MID() string { return m.Header.Get(HEADER_MID) }
 
