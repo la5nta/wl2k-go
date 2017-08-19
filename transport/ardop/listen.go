@@ -76,7 +76,7 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 			select {
 			case <-quit:
 				tnc.SetListenEnabled(false) // Should return this in listener.Close()
-				errors <- ErrTNCClosed
+				errors <- fmt.Errorf("Closed")
 				return
 			case msg, ok := <-msgs:
 				switch {
