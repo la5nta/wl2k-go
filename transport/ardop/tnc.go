@@ -321,8 +321,6 @@ func (tnc *TNC) Ping() error {
 }
 
 // Closes the connection to the TNC (and any on-going connections).
-//
-// This will not actually close the TNC software.
 func (tnc *TNC) Close() error {
 	if tnc.closed {
 		return nil
