@@ -44,6 +44,8 @@ type TNC struct {
 	connected      bool
 	listenerActive bool
 	closed         bool
+
+	beacon *beacon
 }
 
 // OpenTCP opens and initializes an ardop TNC over TCP.
@@ -105,6 +107,8 @@ func open(tnc *TNC, mycall, gridSquare string) error {
 	if err := tnc.SetGridSquare(gridSquare); err != nil {
 		return fmt.Errorf("Set grid square failed: %s", err)
 	}
+
+	tnc.beacon = initBeacon(tnc)
 
 	return nil
 }
@@ -341,6 +345,7 @@ func (tnc *TNC) close() {
 		return
 	}
 
+	tnc.beacon.Close()
 	tnc.eof()
 
 	tnc.ctrl.Close()
@@ -432,24 +437,50 @@ func (tnc *TNC) SendID() error {
 	return tnc.set(cmdSendID, nil)
 }
 
-// BeaconEvery starts a goroutine that sends an ID frame (SendID) at the regular interval d
-//
-// The gorutine will be closed on Close().
-func (tnc *TNC) BeaconEvery(d time.Duration) error {
-	if err := tnc.SendID(); err != nil {
-		return err
-	}
+type beacon struct {
+	reset chan time.Duration
+	close chan struct{}
+}
 
+func (b *beacon) Reset(d time.Duration) { b.reset <- d }
+
+func (b *beacon) Close() {
+	select {
+	case b.close <- struct{}{}:
+	default:
+	}
+}
+
+func initBeacon(tnc *TNC) *beacon {
+	b := &beacon{reset: make(chan time.Duration, 1), close: make(chan struct{}, 1)}
 	go func() {
-		for _ = range time.Tick(d) {
-			if tnc.closed {
+		t := time.NewTimer(10)
+		t.Stop()
+		var d time.Duration
+		for {
+			select {
+			case <-b.close:
+				t.Stop()
 				return
+			case d = <-b.reset:
+				t.Stop()
+			case <-t.C:
+				if tnc.Idle() {
+					tnc.SendID()
+				}
 			}
-			tnc.SendID()
+			if d > 0 {
+				t.Reset(d)
+			}
 		}
 	}()
-	return nil
+	return b
 }
+
+// BeaconEvery starts a goroutine that sends an ID frame (SendID) at the regular interval d
+//
+// The gorutine will be closed on Close() or if d equals 0.
+func (tnc *TNC) BeaconEvery(d time.Duration) error { tnc.beacon.Reset(d); return nil }
 
 // Sets the auxiliary call signs that the TNC should answer to on incoming connections.
 func (tnc *TNC) SetAuxiliaryCalls(calls []string) (err error) {
