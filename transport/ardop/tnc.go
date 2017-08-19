@@ -308,6 +308,16 @@ func (tnc *TNC) eof() {
 	}
 }
 
+// Ping checks the TNC connection for errors
+func (tnc *TNC) Ping() error {
+	if tnc.closed {
+		return ErrTNCClosed
+	}
+
+	_, err := tnc.getString(cmdVersion)
+	return err
+}
+
 // Closes the connection to the TNC (and any on-going connections).
 //
 // This will not actually close the TNC software.
