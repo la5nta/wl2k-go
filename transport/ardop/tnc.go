@@ -184,14 +184,12 @@ func (tnc *TNC) runControlLoop() error {
 			case err = <-errors:
 			}
 
-			if err == io.EOF {
+			if _, ok := err.(*net.OpError); err == io.EOF || ok {
 				break
 			} else if err != nil {
 				if debugEnabled() {
 					log.Printf("Error reading frame: %s", err)
 				}
-
-				tnc.out <- string(cmdCRCFault)
 				continue
 			}
 
