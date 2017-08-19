@@ -24,6 +24,8 @@ var (
 	ErrConnectInProgress = errors.New("A connect is in progress.")
 )
 
+var errTNCClosed = fmt.Errorf("TNC closed")
+
 type TNC struct {
 	ctrlAddr string
 	connAddr string
@@ -46,6 +48,7 @@ type TNC struct {
 
 	connected       bool
 	listenerActive  bool
+	closed          bool
 	disconnectDefer []func(tnc *TNC) error
 }
 
@@ -239,10 +242,24 @@ func (tnc *TNC) runControlLoop() error {
 	return nil
 }
 
+// Ping checks the TNC connection for errors
+func (tnc *TNC) Ping() error {
+	if tnc.closed {
+		return errTNCClosed
+	}
+	_, err := tnc.getString(cmdVersion)
+	return err
+}
+
 // Closes the connection to the TNC (and any on-going connections).
 //
 // This will not actually close the TNC software.
 func (tnc *TNC) Close() error {
+	if tnc.closed {
+		return nil
+	}
+	tnc.closed = true
+
 	if err := tnc.SetListenEnabled(false); err != nil {
 		return err
 	}
