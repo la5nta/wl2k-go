@@ -69,6 +69,7 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 		}()
 
 		msgListener := tnc.in.Listen()
+		defer msgListener.Close()
 		msgs := msgListener.Msgs()
 
 		var remotecall, targetcall string
