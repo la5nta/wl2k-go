@@ -226,6 +226,7 @@ func (tnc *TNC) runControlLoop() error {
 
 		tnc.in.Close()
 		close(tnc.out)
+		tnc.closed = true
 	}()
 
 	out := make(chan string)
