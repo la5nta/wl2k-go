@@ -44,13 +44,21 @@ type tcpVFO struct {
 	prefix string
 }
 
-// OpenTCP connects to the rigctld service and returns a ready to use Rig.
+// OpenTCP opens a new TCPRig and returns a ready to use Rig.
+//
+// The connection to rigctld is not initiated until the connection is requred.
+// To check for a valid connection, call Ping.
 //
 // Caller must remember to Close the Rig after use.
 func OpenTCP(addr string) (*TCPRig, error) {
 	r := &TCPRig{addr: addr}
-	return r, r.dial()
+	return r, nil
 }
+
+// Ping checks that a connection to rigctld is open and valid.
+//
+// If no connection is active, it will try to establish one.
+func (r *TCPRig) Ping() error { _, err := r.cmd(`dump_caps`); return err }
 
 func (r *TCPRig) dial() (err error) {
 	r.mu.Lock()
