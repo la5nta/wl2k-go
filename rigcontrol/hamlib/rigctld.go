@@ -165,43 +165,40 @@ func (v *tcpVFO) SetPTT(on bool) error {
 	return err
 }
 
-// TODO: Move retry logic to *TCPRig
 func (v *tcpVFO) cmd(format string, args ...interface{}) (string, error) {
-	var err error
-	var resp string
-
 	// Add VFO argument (if set)
 	if v.prefix != "" {
 		parts := strings.Split(format, " ")
 		parts = append([]string{parts[0], v.prefix}, parts[1:]...)
 		format = strings.Join(parts, " ")
 	}
+	return v.r.cmd(format, args...)
+}
 
+func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error) {
 	// Retry
 	for i := 0; i < 3; i++ {
-		if v.r.conn == nil {
+		if r.conn == nil {
 			// Try re-dialing
-			if err = v.r.dial(); err != nil {
+			if err = r.dial(); err != nil {
 				break
 			}
 		}
 
-		resp, err = v.r.cmd(format, args...)
+		resp, err = r.doCmd(format, args...)
 		if err == nil {
 			break
 		}
 
 		_, isNetError := err.(net.Error)
 		if err == io.EOF || isNetError {
-			v.r.conn = nil
+			r.conn = nil
 		}
-
 	}
-
 	return resp, err
 }
 
-func (r *TCPRig) cmd(format string, args ...interface{}) (string, error) {
+func (r *TCPRig) doCmd(format string, args ...interface{}) (string, error) {
 	r.tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
 	id, err := r.conn.Cmd(format, args...)
 	r.tcpConn.SetDeadline(time.Time{})
