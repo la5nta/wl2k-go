@@ -321,6 +321,11 @@ func (tnc *TNC) SetAuxiliaryCalls(calls []string) (err error) {
 	return tnc.set(cmdMyAux, strings.Join(calls, ", "))
 }
 
+// Set the TX audio drive level
+func (tnc *TNC) SetDriveLevel(l int) error {
+	return tnc.set(cmdDriveLevel, l)
+}
+
 // Set the number of connect requests before giving up.
 //
 // Allowed values are 3-15
