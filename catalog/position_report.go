@@ -68,27 +68,27 @@ func (p PosReport) Message(mycall string) *fbb.Message {
 
 // Format: 23-42.3N
 func decToMinDec(dec float64, latitude bool) string {
-	deg := int(dec)
-	min := (dec - float64(deg)) * 60.0
-
 	var sign byte
-	if latitude && deg > 0 {
+	if latitude && dec > 0 {
 		sign = 'N'
-	} else if latitude && deg < 0 {
+	} else if latitude && dec < 0 {
 		sign = 'S'
-	} else if !latitude && deg > 0 {
+	} else if !latitude && dec > 0 {
 		sign = 'E'
-	} else if !latitude && deg < 0 {
+	} else if !latitude && dec < 0 {
 		sign = 'W'
 	} else {
 		sign = ' '
 	}
 
+	deg := int(dec)
+	min := (dec - float64(deg)) * 60.0
+
 	var format string
 	if latitude {
-		format = "%02.0f-%.4f%c"
+		format = "%02.0f-%07.4f%c"
 	} else {
-		format = "%03.0f-%.4f%c"
+		format = "%03.0f-%07.4f%c"
 	}
 
 	return fmt.Sprintf(format, math.Abs(float64(deg)), math.Abs(min), sign)
