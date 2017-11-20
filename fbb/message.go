@@ -142,7 +142,7 @@ func (m *Message) Validate() error {
 	//  "... and the file name (up to 50 characters) of the original file."
 	for _, f := range m.Files() {
 		if len(f.Name()) > 50 {
-			return ValidationError{"Files", fmt.Sprintf("Attachment file name too long: %s", f.Name)}
+			return ValidationError{"Files", fmt.Sprintf("Attachment file name too long: %s", f.Name())}
 		}
 	}
 
