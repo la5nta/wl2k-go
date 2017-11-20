@@ -630,6 +630,4 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 			return errors.New(`Unexpected byte in compressed stream: ` + string(c))
 		}
 	}
-
-	return
 }

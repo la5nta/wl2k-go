@@ -137,7 +137,6 @@ func (conn *tncConn) Flush() error {
 	case <-conn.eofChan:
 		return io.EOF
 	}
-	panic("not happening!")
 }
 
 func (conn *tncConn) signalClosed() { close(conn.eofChan) }
@@ -188,7 +187,6 @@ func (conn *tncConn) Close() error {
 			return ErrDisconnectTimeout
 		}
 	}
-	return nil
 }
 
 // TxBufferLen returns the number of bytes in the out buffer queue.

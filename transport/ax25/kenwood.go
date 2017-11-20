@@ -111,8 +111,6 @@ func DialKenwood(dev, mycall, targetcall string, config Config, logger *log.Logg
 			logger.Fatal("got disconnect ", int(line[len(line)-1]))
 		}
 	}
-
-	return conn, nil
 }
 
 func (c *KenwoodConn) Close() error {

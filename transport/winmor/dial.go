@@ -164,7 +164,6 @@ func (conn *tncConn) Close() error {
 			return nil
 		}
 	}
-	panic("Impossible")
 }
 
 func (conn *tncConn) RemoteAddr() net.Addr {
