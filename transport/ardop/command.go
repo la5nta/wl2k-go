@@ -48,7 +48,8 @@ const (
 	cmdPlaybackDevices command = "PLAYBACKDEVICES" // Returns a comma delimited list of all currently installed playback devices.
 	cmdAutoBreak       command = "AUTOBREAK"       // <>[bool]: Disables/enables automatic link turnover (BREAK) by IRS when IRS has outbound data pending and receives an IDLE frame from ISS indicating its’ outbound queue is empty. Default is True.
 	cmdSendID          command = "SENDID"
-	cmdFrequency       command = "FREQUENCY" // <Frequency in Hz>  If TNC Radio control is enabled the FREQUENCY command is sent to the Host upon a change in frequency of the radio. The frequency reported is the DIAL frequency of the radio.
+	cmdFrequency       command = "FREQUENCY"  // <Frequency in Hz>  If TNC Radio control is enabled the FREQUENCY command is sent to the Host upon a change in frequency of the radio. The frequency reported is the DIAL frequency of the radio.
+	cmdInputPeaks      command = "INPUTPEAKS" // Async info sent by ARDOPc
 
 	// Some of the commands that has not been implemented:
 	cmdBreak         command = "BREAK"
@@ -129,6 +130,9 @@ func parseCtrlMsg(str string) ctrlMsg {
 	// bool
 	case cmdCodec, cmdPTT, cmdBusy, cmdTwoToneTest, cmdCWID, cmdListen, cmdAutoBreak:
 		msg.value = strings.ToLower(parts[1]) == "true"
+
+	// Undocumented
+	case cmdInputPeaks:
 
 	// (no params)
 	case cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID:

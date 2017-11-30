@@ -38,8 +38,8 @@ type TNC struct {
 
 	ptt transport.PTTController
 
-	// CRC checksum of frames is not used over TCP, but may be required in future serial implementations
-	doCRC bool
+	// CRC checksum of frames and frame type prefixes is not used over TCPIP
+	isTCP bool
 
 	connected      bool
 	listenerActive bool
@@ -63,7 +63,7 @@ func OpenTCP(addr string, mycall, gridSquare string) (*TNC, error) {
 	}
 
 	tnc := newTNC(ctrlConn, dataConn)
-	tnc.doCRC = false
+	tnc.isTCP = true
 
 	return tnc, open(tnc, mycall, gridSquare)
 }
@@ -75,7 +75,6 @@ func newTNC(ctrl io.ReadWriteCloser, dataConn *net.TCPConn) *TNC {
 		ctrl:     ctrl,
 		dataConn: dataConn,
 		heard:    make(map[string]time.Time),
-		doCRC:    false,
 	}
 }
 
@@ -125,7 +124,11 @@ func (tnc *TNC) init() (err error) {
 		return err
 	}
 
-	if tnc.state = tnc.getState(); tnc.state == Offline {
+	tnc.state, err = tnc.getState()
+	if err != nil {
+		return err
+	}
+	if tnc.state == Offline {
 		if err = tnc.SetCodec(true); err != nil {
 			return fmt.Errorf("Enable codec failed: %s", err)
 		}
@@ -153,9 +156,9 @@ func (tnc *TNC) init() (err error) {
 	return nil
 }
 
-func decodeTNCSteam(rd *bufio.Reader, doCRC bool, frames chan<- frame, errors chan<- error) {
+func decodeTNCStream(fType byte, rd *bufio.Reader, isTCP bool, frames chan<- frame, errors chan<- error) {
 	for {
-		frame, err := readFrame(rd, doCRC)
+		frame, err := readFrameOfType(fType, rd, isTCP)
 		if err != nil {
 			errors <- err
 		} else {
@@ -174,9 +177,12 @@ func (tnc *TNC) runControlLoop() error {
 	// Multiplex the possible TNC->HOST streams (TCP needs two streams) into a single channel of frames
 	frames := make(chan frame)
 	errors := make(chan error)
-	go decodeTNCSteam(rd, tnc.doCRC, frames, errors)
-	if tnc.dataConn != nil {
-		go decodeTNCSteam(bufio.NewReader(tnc.dataConn), tnc.doCRC, frames, errors)
+
+	if tnc.isTCP {
+		go decodeTNCStream('c', rd, tnc.isTCP, frames, errors)
+		go decodeTNCStream('d', bufio.NewReader(tnc.dataConn), tnc.isTCP, frames, errors)
+	} else {
+		go decodeTNCStream('*', rd, false, frames, errors)
 	}
 
 	go func() {
@@ -273,7 +279,7 @@ func (tnc *TNC) runControlLoop() error {
 					log.Println("-->", str)
 				}
 
-				if err := writeCtrlFrame(tnc.doCRC, tnc.ctrl, str); err != nil {
+				if err := writeCtrlFrame(tnc.isTCP, tnc.ctrl, str); err != nil {
 					if debugEnabled() {
 						log.Println(err)
 					}
@@ -443,6 +449,9 @@ type beacon struct {
 func (b *beacon) Reset(d time.Duration) { b.reset <- d }
 
 func (b *beacon) Close() {
+	if b == nil {
+		return
+	}
 	select {
 	case b.close <- struct{}{}:
 	default:
@@ -546,12 +555,12 @@ func (tnc *TNC) Abort() error {
 	return tnc.set(cmdAbort, nil)
 }
 
-func (tnc *TNC) getState() State {
+func (tnc *TNC) getState() (State, error) {
 	v, err := tnc.get(cmdState)
 	if err != nil {
-		panic(fmt.Sprintf("getState(): %s", err))
+		return Offline, nil
 	}
-	return v.(State)
+	return v.(State), nil
 }
 
 // Sends a connect command to the TNC. Users should call Dial().

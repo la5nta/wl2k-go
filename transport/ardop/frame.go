@@ -29,11 +29,16 @@ type cmdFrame string
 
 func (f cmdFrame) Parsed() ctrlMsg { return parseCtrlMsg(string(f)) }
 
-func writeCtrlFrame(crc16 bool, w io.Writer, format string, params ...interface{}) error {
-	payload := fmt.Sprintf(format+"\r", params...)
-	_, err := fmt.Fprint(w, "C:"+payload)
+func writeCtrlFrame(isTCP bool, w io.Writer, format string, params ...interface{}) error {
+	var prefix string
+	if !isTCP {
+		prefix = "C:"
+	}
 
-	if crc16 && err == nil {
+	payload := fmt.Sprintf(format+"\r", params...)
+	_, err := fmt.Fprint(w, prefix+payload)
+
+	if !isTCP && err == nil {
 		sum := crc16Sum([]byte(payload))
 		err = binary.Write(w, binary.BigEndian, sum)
 	}
@@ -41,16 +46,17 @@ func writeCtrlFrame(crc16 bool, w io.Writer, format string, params ...interface{
 	return err
 }
 
-func readFrame(reader *bufio.Reader, crc16 bool) (frame, error) {
-	fType, err := reader.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
-	reader.ReadByte() // Discard ';'. (TODO: Use reader.Discard(1) when we drop support for Go <= 1.4).
-
+func readFrameOfType(fType byte, reader *bufio.Reader, isTCP bool) (frame, error) {
+	var err error
 	var data []byte
 	switch fType {
+	case '*': // !isTCP
+		fType, err = reader.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		reader.ReadByte() // Discard ';'. (TODO: Use reader.Discard(1) when we drop support for Go <= 1.4).
+		return readFrameOfType(fType, reader, isTCP)
 	case 'c':
 		data, err = reader.ReadBytes('\r')
 	case 'd':
@@ -77,7 +83,7 @@ func readFrame(reader *bufio.Reader, crc16 bool) (frame, error) {
 	}
 
 	// Verify CRC sums
-	if crc16 {
+	if !isTCP {
 		sumBytes := make([]byte, 2)
 		reader.Read(sumBytes)
 		crc := binary.BigEndian.Uint16(sumBytes)

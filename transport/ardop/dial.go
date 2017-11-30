@@ -42,7 +42,7 @@ func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {
 		ctrlIn:     tnc.in,
 		dataIn:     tnc.dataIn,
 		eofChan:    make(chan struct{}),
-		doCRC:      tnc.doCRC,
+		isTCP:      tnc.isTCP,
 	}
 
 	return tnc.data, nil

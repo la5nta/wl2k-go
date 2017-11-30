@@ -23,7 +23,7 @@ type tncConn struct {
 	dataIn   <-chan []byte
 	eofChan  chan struct{}
 	ctrlIn   broadcaster
-	doCRC    bool
+	isTCP    bool
 
 	remoteAddr Addr
 	localAddr  Addr
@@ -82,7 +82,9 @@ func (conn *tncConn) Write(p []byte) (int, error) {
 	//"D:" + 2 byte count big endian + binary data + 2 byte CRC
 
 	// D:
-	fmt.Fprint(&buf, "D:")
+	if !conn.isTCP {
+		fmt.Fprint(&buf, "D:")
+	}
 
 	// 2 byte length
 	binary.Write(&buf, binary.BigEndian, uint16(len(p)))
@@ -91,7 +93,7 @@ func (conn *tncConn) Write(p []byte) (int, error) {
 	n, _ := buf.Write(p)
 
 	// 2 byte CRC
-	if conn.doCRC {
+	if !conn.isTCP {
 		sum := crc16Sum(buf.Bytes()[2:]) // [2:], don't include D: in CRC sum.
 		binary.Write(&buf, binary.BigEndian, sum)
 	}
