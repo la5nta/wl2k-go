@@ -19,5 +19,8 @@ script:
   - go test -v $(go list ./...|grep -v /vendor/)
 
 matrix:
+  exclude:
+    - os: osx
+      go: 1.5
   allow_failures:
     - go: tip
