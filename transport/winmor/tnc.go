@@ -313,6 +313,9 @@ func (tnc *TNC) SetGridSquare(gs string) error {
 
 // SetMycall sets the provided callsign as the main callsign for the TNC
 func (tnc *TNC) SetMycall(mycall string) error {
+	if !tnc.Idle() {
+		return ErrConnectInProgress
+	}
 	return tnc.set(cmdMyCall, mycall)
 }
 

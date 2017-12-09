@@ -85,20 +85,23 @@ func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 	if url.Scheme != "winmor" {
 		return nil, transport.ErrUnsupportedScheme
 	}
+	if url.User == nil {
+		return tnc.Dial(url.Target)
+	}
 
-	if url.User != nil {
-		original, err := tnc.MyCall()
-		if err != nil {
-			return nil, err
-		}
-		tnc.onDisconnect(func(tnc *TNC) error { return tnc.SetMycall(original) })
-
+	currentCallsign, err := tnc.MyCall()
+	switch {
+	case err != nil:
+		return nil, err
+	case currentCallsign != url.User.Username():
 		if err := tnc.SetMycall(url.User.Username()); err != nil {
 			return nil, err
 		}
+		tnc.onDisconnect(func(tnc *TNC) error { return tnc.SetMycall(currentCallsign) })
+		fallthrough
+	default:
+		return tnc.Dial(url.Target)
 	}
-
-	return tnc.Dial(url.Target)
 }
 
 func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {
