@@ -104,7 +104,7 @@ func readFrameOfType(fType byte, reader *bufio.Reader, isTCP bool) (frame, error
 }
 
 // Data example: " LA5NTA:[JP20QE] "
-var reID = regexp.MustCompile(`(?:ID)? (\w+):\[(\w+)\]`)
+var reID = regexp.MustCompile(`(\w+)[:\s]*\[(\w+)\]`)
 
 func parseIDFrame(df dFrame) (callsign, gridsquare string, err error) {
 	if !df.IDFrame() {
