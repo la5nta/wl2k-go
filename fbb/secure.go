@@ -7,7 +7,6 @@ package fbb
 import (
 	"crypto/md5"
 	"fmt"
-	"strings"
 )
 
 // This salt was found in paclink-unix's source code.
@@ -27,7 +26,7 @@ var winlinkSecureSalt = []byte{
 // This algorithm for generating a secure login response token has been ported
 // to Go from the paclink-unix implementation.
 func secureLoginResponse(challenge, password string) string {
-	payload := strings.ToUpper(challenge+password) + string(winlinkSecureSalt)
+	payload := challenge + password + string(winlinkSecureSalt)
 
 	sum := md5.Sum([]byte(payload))
 

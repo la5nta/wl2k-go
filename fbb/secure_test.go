@@ -7,14 +7,17 @@ package fbb
 import "testing"
 
 func TestSecureLoginResponse(t *testing.T) {
-	var (
-		challenge = "23753528"
-		password  = "foobar"
-		expect    = "72768415"
-	)
+	type test struct{ challenge, password, expect string }
 
-	if got := secureLoginResponse(challenge, password); got != expect {
-		t.Errorf("Got unexpected login response, expected '%s' got '%s'.", expect, got)
+	tests := []test{
+		{challenge: "23753528", password: "FOOBAR", expect: "72768415"},
+		{challenge: "23753528", password: "FooBar", expect: "95074758"},
+	}
+
+	for i, v := range tests {
+		if got := secureLoginResponse(v.challenge, v.password); got != v.expect {
+			t.Errorf("%d: Got unexpected login response, expected '%s' got '%s'.", i, v.expect, got)
+		}
 	}
 }
 
