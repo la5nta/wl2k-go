@@ -5,6 +5,8 @@
 package fbb
 
 import (
+	"fmt"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -23,6 +25,20 @@ func TestParseFW(t *testing.T) {
 			t.Errorf("Got unexpected error while parsing '%s': %s", input, err)
 		} else if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Expected %s, got %s", expected, got)
+		}
+	}
+}
+
+func TestIsLoginFailure(t *testing.T) {
+	tests := map[error]bool{
+		fmt.Errorf("[1] Secure login failed - account password does not match. - Disconnecting (88.90.2.192)"): true,
+		io.EOF:              false,
+		io.ErrUnexpectedEOF: false,
+	}
+
+	for err, expect := range tests {
+		if got := IsLoginFailure(err); got != expect {
+			t.Errorf("'%s' - Expected %t got %t", err.Error(), expect, got)
 		}
 	}
 }

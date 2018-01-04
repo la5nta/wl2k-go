@@ -16,6 +16,16 @@ import (
 
 var ErrNoFB2 = errors.New("Remote does not support B2 Forwarding Protocol")
 
+// IsLoginFailure returns a boolean indicating whether the error is known to
+// report that the secure login failed.
+func IsLoginFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "secure login failed")
+}
+
 func (s *Session) handshake(rw io.ReadWriter) error {
 	if s.master {
 		// Send MOTD lines
