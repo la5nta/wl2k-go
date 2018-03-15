@@ -507,7 +507,12 @@ func (f *File) Data() []byte {
 }
 
 // Create a new file (attachment) with the given name and data.
+//
+// A B2F file must have an associated name. If the name is empty, NewFile will panic.
 func NewFile(name string, data []byte) *File {
+	if name == "" {
+		panic("Empty filename is not allowed")
+	}
 	return &File{
 		data: data,
 		name: name,
