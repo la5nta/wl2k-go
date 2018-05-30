@@ -210,6 +210,10 @@ func (tnc *TNC) runControlLoop() error {
 			if d, ok := frame.(dFrame); ok {
 				switch {
 				case d.ARQFrame():
+					if !tnc.connected {
+						// ARDOPc is sending non-ARQ data as ARQ frames when not connected
+						continue
+					}
 					select {
 					case tnc.dataIn <- d.data:
 					case <-time.After(time.Minute):
