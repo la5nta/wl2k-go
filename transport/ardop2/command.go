@@ -17,8 +17,8 @@ const (
 	cmdCancelPending   command = "CANCELPENDING"   // Indicates to the host that the prior PENDING Connect Request was not to MYCALL or one of the MYAUX call signs) This allows the Host to resume scanning.
 	cmdCRCFault        command = "CRCFAULT"        // Prompt to resend last frame
 	cmdAbort           command = "ABORT"           // Immediately aborts an ARQ Connection or a FEC Send session
-	cmdARQBW           command = "ARQBW"           // <200MAX|500MAX|1000MAX|2000MAX|200FORCED|500FORCED|1000FORCED|2000FORCED>
-	cmdARQTimeout      command = "ARQTIMEOUT"      // ARQTIMEOUT<30-240> Set/get the ARQ Timeout in seconds
+	cmdARQBW           command = "ARQBW"           // ARQ bandwidth, in Hz. 200|500|2500
+	cmdARQTimeout      command = "ARQTIMEOUT"      // ARQTIMEOUT<30-600> Set/get the ARQ Timeout in seconds
 	cmdARQCall         command = "ARQCALL"         // <Target Callsign Repeat Count>
 	cmdBuffer          command = "BUFFER"          // <[int int int int int]: Buffer statistics
 	cmdClose           command = "CLOSE"           // Provides an orderly shutdown of all connections, release of all sound card resources and closes the Virtual TNC Program or hardware
@@ -32,6 +32,7 @@ const (
 	cmdListen          command = "LISTEN"          // Enables/disables server’s response to an ARQ connect request. Default = True. May be used to block connect requests during scanning.
 	cmdMyAux           command = "MYAUX"           // <aux call sign1, aux call sign2, … aux call sign10>
 	cmdMyCall          command = "MYCALL"          // Sets current call sign. If not a valid call generates a FAULT. Legitimate call signs include from 3 to 7 ASCII characters (A-Z, 0-9) followed by an optional “-“ and an SSID of -0 to -15 or -A to -Z. An SSID of -0 is treated as no SSID
+	cmdNegotiateBW     command = "NEGOTIATEBW"     // <true|false> enable bandwidth negotiation
 	cmdPlayback        command = "PLAYBACK"        // <device name>Sets desired sound card playback device. If no device name will reply with the current assigned playback device.
 	cmdProtocolMode    command = "PROTOCOLMODE"    // PROTOCOLMODE<ARQ|FEC> Sets/Gets the protocol mode. If ARQ and LISTEN above is TRUE will answer Connect requests to MYCALL or any call signs in MYAUX. If FEC will decode but not respond to any connect request.
 	cmdTwoToneTest     command = "TWOTONETEST"     // Send 5 second two-tone burst at the normal leader amplitude. May be used in adjusting drive level to the radio. If sent while in any state except DISC will result in a fault “not from state .....”
@@ -39,7 +40,7 @@ const (
 	cmdStatus          command = "STATUS"          // ? e.g.: "STATUS CONNECT TO LA3F FAILED!"
 	cmdNewState        command = "NEWSTATE"        // <[State]: Sent when the state changes
 	cmdDisconnected    command = "DISCONNECTED"    // <[]: Signals that a connect failed. Duplicate state notification?
-	cmdConnected       command = "CONNECTED"       // <[string string]: Signals that an ARQ connection has been established. e.g. “CONNECTED W1ABC 500”
+	cmdConnected       command = "CONNECTED"       // <[string string [string]]: Signals that an ARQ connection has been established. e.g. “CONNECTED W1ABC 500 EM56”
 	cmdPTT             command = "PTT"             // <[bool]: PTT active or not
 	cmdFault           command = "FAULT"           // <[string]: Error message
 	cmdBusy            command = "BUSY"            // <[bool]: Returns whether the channel is busy
@@ -48,12 +49,18 @@ const (
 	cmdPlaybackDevices command = "PLAYBACKDEVICES" // Returns a comma delimited list of all currently installed playback devices.
 	cmdAutoBreak       command = "AUTOBREAK"       // <>[bool]: Disables/enables automatic link turnover (BREAK) by IRS when IRS has outbound data pending and receives an IDLE frame from ISS indicating its’ outbound queue is empty. Default is True.
 	cmdSendID          command = "SENDID"
-	cmdFrequency       command = "FREQUENCY"  // <Frequency in Hz>  If TNC Radio control is enabled the FREQUENCY command is sent to the Host upon a change in frequency of the radio. The frequency reported is the DIAL frequency of the radio.
-	cmdInputPeaks      command = "INPUTPEAKS" // Async info sent by ARDOPc
+	cmdFrequency       command = "FREQUENCY"    // <Frequency in Hz>  If TNC Radio control is enabled the FREQUENCY command is sent to the Host upon a change in frequency of the radio. The frequency reported is the DIAL frequency of the radio.
+	cmdInputPeaks      command = "INPUTPEAKS"   // Async info sent by ARDOPc
+	cmdRejBW           command = "REJECTEDBW"   // Remote side rejected connection due to bandwidth incompatibility
+	cmdRejBusy         command = "REJECTEDBUSY" // Connection rejected due to channel busy
 
 	// Some of the commands that has not been implemented:
 	cmdBreak         command = "BREAK"
-	cmdBusyLock      command = "BUSYLOCK"
+	cmdBusyLock      command = "BUSYBLOCK"
+	cmdBusyDet       command = "BUSYDET" // <0-10> gets or sets busy detector threshold
+	cmdCQ            command = "CQ"      // <Callsign Gridsquare> Reports receipt of CQ
+	cmdEnablePingAck command = "ENABLEPINGACK"
+	cmdPing          command = "PING" // Request to send, or receipt of, an ARDOP PING
 	cmdRadioTuner    command = "RADIOTUNER"
 	cmdRadioAnt      command = "RADIOANT"      // Selects the radio antenna 1 or 2 for those radios that support antenna switching. If the parameter is 0 will not change the antenna setting even if the radio supports it. If sent without a parameter will return 0, 1 or 2. If RADIOCONTROL Is false or RADIOMODEL has not been set will return FAULT
 	cmdRadioCtrl     command = "RADIOCTRL"     // Enables/disables the radio control capability of the ARDOP_Win TNC. If sent without a parameter will return the current value of RADIOCONTROL enable.
@@ -83,7 +90,7 @@ const (
 	cmdDisplay       command = "DISPLAY"    // Sets the Dial frequency display of the Waterfall or Spectrum display. If sent without parameters will return the current Dial frequency display. If > 100000 Display will read in MHz.
 	cmdTrace         command = "CMDTRACE"   // Get/Set command Trace flag to log all commands to from the TNC to the ARDOP_Win TNC debug log.
 	cmdFECid         command = "FECID"      // Disable/Enable ID (with optional grid square) at start of FEC transmissions
-	cmdFECmode       command = "FECMODE"    // FECMODE<8FSK.200.25|4FSK.200.50S|4FSK.200.50,4PSK.200.100S|4PSK.200.100|8PSK.200.100|16FSK.500.25S|16FSK.500.25|4FSK.500.100S|4FSK.500.100| 4PSK.500.100|8PSK.500.100|4PSK.500.167|8PSK.500.167|4FSK.1000.100|4PSK.1000.100|8PSK.1000.100|4PSK.1000.167|8PSK.1000.167|4FSK.2000.600S|4FSK.2000.600|4FSK.2000.100|4PSK.2000.100|8PSK.2000.100|4PSK.2000.167|8PSK.2000.167
+	cmdFECmode       command = "FECMODE"    // FECMODE<4PSK.200.50|4PSK.200.100|16QAM.200.100|4FSK.500.50| 4PSK.500.50|16QAMR.500.100|16QAM.500.100|4FSK.1000.50|4PSKR.2500.50| 4PSK.2500.50|16QAMR.2500.100|16QAM.2500.100>
 	cmdFECrepeats    command = "FECREPEATS" // <0-5> Sets the number of times a frame is repeated in FEC (multicast) mode. Higher number of repeats increases good copy probability under marginal conditions but reduces net throughput.
 	cmdFECsend       command = "FECSEND"    // Start/Stop FEC broadcast/multicast mode for specific FECMODE. FECSEND <False> will abort a FEC broadcast.
 
@@ -135,10 +142,10 @@ func parseCtrlMsg(str string) ctrlMsg {
 	case cmdInputPeaks:
 
 	// (no params)
-	case cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID:
+	case cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID, cmdRejBW, cmdRejBusy:
 
 	// (echo-back only)
-	case cmdInitialize, cmdARQCall, cmdARQBW, cmdProtocolMode:
+	case cmdInitialize, cmdARQCall, cmdARQBW, cmdProtocolMode, cmdNegotiateBW, cmdEnablePingAck, cmdBusyDet:
 
 	// State
 	case cmdNewState, cmdState:
@@ -150,7 +157,7 @@ func parseCtrlMsg(str string) ctrlMsg {
 		msg.value = parts[1]
 
 	// []string (space separated)
-	case cmdConnected:
+	case cmdConnected, cmdPing, cmdCQ:
 		msg.value = parseList(parts[1], " ")
 
 	// []string (comma separated)

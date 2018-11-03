@@ -402,9 +402,25 @@ func (tnc *TNC) SetAutoBreak(on bool) error {
 	return tnc.set(cmdAutoBreak, on)
 }
 
+// Gets the ARQ bandwidth
+func (tnc *TNC) ARQBandwidth() (int, error) {
+	return tnc.getInt(cmdARQBW)
+}
+
 // Sets the ARQ bandwidth
-func (tnc *TNC) SetARQBandwidth(bw Bandwidth) error {
+func (tnc *TNC) SetARQBandwidth(bw int) error {
 	return tnc.set(cmdARQBW, bw)
+}
+
+// If negotiate bandwidth flag is set, peer bandwidths other than the
+// ARQBandwidth() are acceptable
+func (tnc *TNC) NegotiateBandwidth() (bool, error) {
+	return tnc.getBool(cmdNegotiateBW)
+}
+
+// Enable or disable bandwidth negotiation
+func (tnc *TNC) SetNegotiateBandwidth(negotiate bool) error {
+	return tnc.set(cmdNegotiateBW, negotiate)
 }
 
 // Sets the ARQ timeout

@@ -7,7 +7,6 @@ package ardop2
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ const (
 	Disconnected       // The session is disconnected, the sound card remains active
 	ISS                // Information Sending Station (Sending Data)
 	IRS                // Information Receiving Station (Receiving data)
-	Idle               // ??
+	Quiet              // ??
 	FECSend            // ??
 	FECReceive         // Receiving FEC (unproto) data
 )
@@ -47,39 +46,7 @@ var (
 	ErrTNCClosed            = errors.New("TNC closed")
 )
 
-// Bandwidth definitions of all supported ARQ bandwidths.
-var (
-	Bandwidth200Max     = Bandwidth{false, 200}
-	Bandwidth500Max     = Bandwidth{false, 500}
-	Bandwidth1000Max    = Bandwidth{false, 1000}
-	Bandwidth2000Max    = Bandwidth{false, 2000}
-	Bandwidth200Forced  = Bandwidth{true, 200}
-	Bandwidth500Forced  = Bandwidth{true, 500}
-	Bandwidth1000Forced = Bandwidth{true, 1000}
-	Bandwidth2000Forced = Bandwidth{true, 2000}
-)
-
 type State uint8
-
-// Bandwidth represents the ARQ bandwidth.
-type Bandwidth struct {
-	Forced bool // Force use of max bandwidth.
-	Max    uint // Max bandwidh to use.
-}
-
-// Stringer for Bandwidth returns a valid bandwidth parameter that can be sent to the TNC.
-func (bw Bandwidth) String() string {
-	str := fmt.Sprintf("%d", bw.Max)
-	if bw.Forced {
-		str += "FORCED"
-	} else {
-		str += "MAX"
-	}
-	return str
-}
-
-// IsZero returns true if bw is it's zero value.
-func (bw Bandwidth) IsZero() bool { return bw.Max == 0 }
 
 var stateMap = map[string]State{
 	"":        Unknown,
@@ -87,7 +54,7 @@ var stateMap = map[string]State{
 	"DISC":    Disconnected,
 	"ISS":     ISS,
 	"IRS":     IRS,
-	"IDLE":    Idle,
+	"QUIET":   Quiet,
 	"FECRcv":  FECReceive,
 	"FECSend": FECSend,
 }

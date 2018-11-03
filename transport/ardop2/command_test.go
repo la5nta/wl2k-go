@@ -24,6 +24,7 @@ func TestParse(t *testing.T) {
 		"GRIDSQUARE JP20QH":                 ctrlMsg{cmdGridSquare, "JP20QH"},
 		"MYAUX LA5NTA,LE3OF":                ctrlMsg{cmdMyAux, []string{"LA5NTA", "LE3OF"}},
 		"MYAUX LA5NTA, LE3OF":               ctrlMsg{cmdMyAux, []string{"LA5NTA", "LE3OF"}},
+		"CQ LA5NTA JP20QH":                  ctrlMsg{cmdCQ, []string{"LA5NTA", "JP20QH"}},
 		"VERSION 1.4.7.0":                   ctrlMsg{cmdVersion, "1.4.7.0"},
 		"FREQUENCY 14096400":                ctrlMsg{cmdFrequency, 14096400},
 	}
