@@ -42,6 +42,8 @@ var (
 	ErrActiveListenerExists = errors.New("An active listener is already registered with this TNC.")
 	ErrDisconnectTimeout    = errors.New("Disconnect timeout: aborted connection.")
 	ErrConnectTimeout       = errors.New("Connect timeout")
+	ErrRejectedBandwidth    = errors.New("Connection rejected by peer: incompatible bandwidth")
+	ErrRejectedBusy         = errors.New("Connection rejected: channel busy")
 	ErrChecksumMismatch     = errors.New("Control protocol checksum mismatch")
 	ErrTNCClosed            = errors.New("TNC closed")
 )

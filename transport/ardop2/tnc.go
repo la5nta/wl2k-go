@@ -597,6 +597,10 @@ func (tnc *TNC) arqCall(targetcall string, repeat int) error {
 		switch msg.cmd {
 		case cmdFault:
 			return fmt.Errorf(msg.String())
+		case cmdRejBW:
+			return ErrRejectedBandwidth
+		case cmdRejBusy:
+			return ErrRejectedBusy
 		case cmdNewState:
 			if tnc.state == Disconnected {
 				return ErrConnectTimeout
