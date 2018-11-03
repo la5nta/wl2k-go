@@ -73,7 +73,7 @@ func ParseURL(rawurl string) (*URL, error) {
 		url.Digis = []string{}
 	}
 
-	digisUnsupported := url.Scheme == "winmor" || url.Scheme == "ardop" || url.Scheme == "telnet"
+	digisUnsupported := url.Scheme == "winmor" || url.Scheme == "ardop" || url.Scheme == "ardop2" || url.Scheme == "telnet"
 	if len(url.Digis) > 0 && digisUnsupported {
 		return url, ErrDigisUnsupported
 	}
