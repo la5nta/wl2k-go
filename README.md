@@ -137,5 +137,6 @@ F6FBB Jean-Paul ROUBELAT - the FBB forwarding protocol
 
 * LA3QMA - Kai Günter Brandt
 * LA5NTA - Martin Hebnes Pedersen
+* Colin Stagner
 
 _wl2k-go is not affiliated with The Winlink Development Team nor the Winlink 2000 project [http://winlink.org]._
