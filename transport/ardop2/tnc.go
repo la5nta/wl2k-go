@@ -352,16 +352,16 @@ func (tnc *TNC) close() {
 	if tnc.closed {
 		return
 	}
+	tnc.closed = true // bug(martinhpedersen): Data race in tnc.Close can cause panic on duplicate calls
 
 	tnc.beacon.Close()
 	tnc.eof()
 
 	tnc.ctrl.Close()
 
-	tnc.in.Close()
+	tnc.in.Close() // TODO: This may panic due to the race mentioned above. Consider using a mutex to guard tnc.closed.
 	close(tnc.out)
 	close(tnc.dataOut)
-	tnc.closed = true
 
 	// no need for a finalizer anymore
 	runtime.SetFinalizer(tnc, nil)
