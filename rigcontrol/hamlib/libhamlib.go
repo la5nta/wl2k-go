@@ -132,17 +132,17 @@ func (r *SerialRig) Close() error {
 	return nil
 }
 
-// Returns the Rig's active VFO (for control).
+// CurrentVFO returns the Rig's active VFO (for control).
 func (r *SerialRig) CurrentVFO() VFO {
 	return cVFO{C.RIG_VFO_CURR, r}
 }
 
-// Returns the Rig's A vfo.
+// VFOA returns the Rig's A vfo.
 func (r *SerialRig) VFOA() (VFO, error) {
 	return cVFO{C.RIG_VFO_A, r}, nil
 }
 
-// Returns the Rig's B vfo.
+// VFOB returns the Rig's B vfo.
 func (r *SerialRig) VFOB() (VFO, error) {
 	return cVFO{C.RIG_VFO_B, r}, nil
 }
@@ -177,7 +177,7 @@ func (v cVFO) SetFreq(freq int) error {
 	)
 }
 
-// Gets the dial frequency for this VFO.
+// GetFreq gets the dial frequency for this VFO.
 func (v cVFO) GetFreq() (int, error) {
 	var freq C.freq_t
 	err := codeToError(C.rig_get_freq(&v.r.r, v.v, &freq))
@@ -200,17 +200,17 @@ func (v cVFO) GetMode() (m Mode, pwb int, err error) {
 	return Mode(cm), int(cpwb), err
 }
 
-// Returns the narrow (closest) passband for the given Mode.
+// PassbandNarrow returns the narrow (closest) passband for the given Mode.
 func (r *SerialRig) PassbandNarrow(m Mode) int {
 	return int(C.rig_passband_narrow(&r.r, C.rmode_t(m)))
 }
 
-// Returns the normal (default) passband for the given Mode.
+// PassbandNormal returns the normal (default) passband for the given Mode.
 func (r *SerialRig) PassbandNormal(m Mode) int {
 	return int(C.rig_passband_normal(&r.r, C.rmode_t(m)))
 }
 
-// Returns the wide (default) passband for the given Mode.
+// PassbandWide returns the wide (default) passband for the given Mode.
 func (r *SerialRig) PassbandWide(m Mode) int {
 	return int(C.rig_passband_wide(&r.r, C.rmode_t(m)))
 }

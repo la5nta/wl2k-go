@@ -343,7 +343,7 @@ func (s *Session) SetLogger(logger *log.Logger) {
 // Set this session's user agent
 func (s *Session) SetUserAgent(ua UserAgent) { s.ua = ua }
 
-// Get this session's user agent
+// UserAgent gets this session's user agent
 func (s *Session) UserAgent() UserAgent { return s.ua }
 
 func (s *Session) outbound() []*Proposal {

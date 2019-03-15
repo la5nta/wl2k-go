@@ -12,7 +12,7 @@ import (
 	_ "github.com/paulrosania/go-charset/data"
 )
 
-// StringToBytes converts the body into a slice of bytes with the given charset encoding.
+// StringToBody converts the body into a slice of bytes with the given charset encoding.
 //
 // CRLF line break is enforced.
 // Line break are inserted if a line is longer than 1000 characters (including CRLF).

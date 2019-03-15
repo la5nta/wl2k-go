@@ -20,7 +20,7 @@ func (conn Conn) RemoteCall() string { return conn.remoteCall }
 
 type listener struct{ net.Listener }
 
-// Starts a new net.Listener listening for incoming connections.
+// Listen starts a new net.Listener listening for incoming connections.
 //
 // The Listener takes care of the special Winlink telnet login.
 func Listen(addr string) (ln net.Listener, err error) {

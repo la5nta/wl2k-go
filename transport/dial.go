@@ -36,7 +36,7 @@ var dialers struct {
 	m  map[string]Dialer
 }
 
-// RigisterDialer registers a new scheme and it's Dialer.
+// RegisterDialer registers a new scheme and it's Dialer.
 //
 // The list of registered dialers is used by DialURL.
 func RegisterDialer(scheme string, dialer Dialer) {

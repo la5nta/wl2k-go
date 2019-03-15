@@ -370,7 +370,7 @@ func readSection(reader *bufio.Reader, readN int) ([]byte, error) {
 	return buf, nil
 }
 
-// Returns true if the given Address is the only receiver of this Message.
+// IsOnlyReceiver returns true if the given Address is the only receiver of this Message.
 func (m *Message) IsOnlyReceiver(addr Address) bool {
 	receivers := m.Receivers()
 	if len(receivers) != 1 {
@@ -425,7 +425,7 @@ func (m *Message) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Writes Message to the given Writer in the Winlink Message format.
+// Write writes Message to the given Writer in the Winlink Message format.
 //
 // If the Date header field is not formatted correctly, an error will be returned.
 func (m *Message) Write(w io.Writer) (err error) {
@@ -484,7 +484,7 @@ func (m *Message) String() string {
 	return string(buf.Bytes())
 }
 
-// JSON marshaller for File.
+// MarshalJSON marshaller for File.
 func (f *File) MarshalJSON() ([]byte, error) {
 	b, err := json.Marshal(struct {
 		Name string

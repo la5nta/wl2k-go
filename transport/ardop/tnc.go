@@ -367,7 +367,7 @@ func (tnc *TNC) close() {
 	runtime.SetFinalizer(tnc, nil)
 }
 
-// Returns true if channel is clear
+// Busy returns true if channel is clear
 func (tnc *TNC) Busy() bool {
 	return tnc.busy
 }
@@ -377,17 +377,17 @@ func (tnc *TNC) Version() (string, error) {
 	return tnc.getString(cmdVersion)
 }
 
-// Returns the current state of the TNC
+// State returns the current state of the TNC
 func (tnc *TNC) State() State {
 	return tnc.state
 }
 
-// Returns the grid square as reported by the TNC
+// GridSquare returns the grid square as reported by the TNC
 func (tnc *TNC) GridSquare() (string, error) {
 	return tnc.getString(cmdGridSquare)
 }
 
-// Returns mycall as reported by the TNC
+// MyCall returns mycall as reported by the TNC
 func (tnc *TNC) MyCall() (string, error) {
 	return tnc.getString(cmdMyCall)
 }
@@ -412,7 +412,7 @@ func (tnc *TNC) SetARQTimeout(d time.Duration) error {
 	return tnc.set(cmdARQTimeout, int(d/time.Second))
 }
 
-// Gets the ARQ timeout
+// ARQTimeout gets the ARQ timeout
 func (tnc *TNC) ARQTimeout() (time.Duration, error) {
 	seconds, err := tnc.getInt(cmdARQTimeout)
 	return time.Duration(seconds) * time.Second, err
@@ -506,7 +506,7 @@ func (tnc *TNC) SetCodec(state bool) error {
 	return tnc.set(cmdCodec, fmt.Sprintf("%t", state))
 }
 
-// ListenState() returns a StateReceiver which can be used to get notification when the TNC state changes.
+// ListenEnabled returns a StateReceiver which can be used to get notification when the TNC state changes.
 func (tnc *TNC) ListenEnabled() StateReceiver {
 	return tnc.in.ListenState()
 }

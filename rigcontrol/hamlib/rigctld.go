@@ -87,10 +87,10 @@ func (r *TCPRig) Close() error {
 	return r.conn.Close()
 }
 
-// Returns the Rig's active VFO (for control).
+// CurrentVFO returns the Rig's active VFO (for control).
 func (r *TCPRig) CurrentVFO() VFO { return &tcpVFO{r, ""} }
 
-// Returns the Rig's VFO A (for control).
+// VFOA returns the Rig's VFO A (for control).
 //
 // ErrNotVFOMode is returned if rigctld is not in VFO mode.
 func (r *TCPRig) VFOA() (VFO, error) {
@@ -103,7 +103,7 @@ func (r *TCPRig) VFOA() (VFO, error) {
 	return &tcpVFO{r, "VFOA"}, nil
 }
 
-// Returns the Rig's VFO B (for control).
+// VFOB returns the Rig's VFO B (for control).
 //
 // ErrNotVFOMode is returned if rigctld is not in VFO mode.
 func (r *TCPRig) VFOB() (VFO, error) {
@@ -124,7 +124,7 @@ func (r *TCPRig) VFOMode() (bool, error) {
 	return resp == "CHKVFO 1", nil
 }
 
-// Gets the dial frequency for this VFO.
+// GetFreq gets the dial frequency for this VFO.
 func (v *tcpVFO) GetFreq() (int, error) {
 	resp, err := v.cmd(`\get_freq`)
 	if err != nil {

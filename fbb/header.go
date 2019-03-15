@@ -137,7 +137,7 @@ func (h Header) Write(w io.Writer) error {
 // (See DecodeHeader for mime.WordDecoder differences).
 type WordDecoder struct{ mime.WordDecoder }
 
-// Decode decodes an encoded-word.
+// DecodeHeader decodes decodes an encoded-word.
 //
 // If word is not a valid RFC 2047 encoded-word, word is decoded as raw ISO-8859-1 as a work-around for RMS Express' non-conforming encoding of the Subject header.
 func (d *WordDecoder) DecodeHeader(header string) (string, error) {

@@ -100,12 +100,12 @@ func (p *Proposal) DataIsComplete() bool {
 	return len(p.compressedData) == p.compressedSize
 }
 
-// Returns the uniqe Message ID
+// MID returns the uniqe Message ID
 func (p *Proposal) MID() string {
 	return p.mid
 }
 
-// Returns the title of this proposal
+// Title returns the title of this proposal
 func (p *Proposal) Title() string {
 	return p.title
 }
