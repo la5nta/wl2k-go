@@ -72,7 +72,7 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 		defer msgListener.Close()
 		msgs := msgListener.Msgs()
 
-		var remotecall, targetcall string
+		var targetcall string
 		for {
 			select {
 			case <-quit:
@@ -80,19 +80,22 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 				errors <- fmt.Errorf("Closed")
 				return
 			case msg, ok := <-msgs:
-				switch {
-				case !ok:
+				if !ok {
 					errors <- ErrTNCClosed
 					return
-				case msg.cmd == cmdCancelPending:
-					remotecall, targetcall = "", ""
-				case msg.cmd == cmdConnected:
-					remotecall = msg.value.([]string)[0]
-				case msg.cmd == cmdTarget:
-					targetcall = msg.String()
 				}
-
-				if len(remotecall) > 0 && len(targetcall) > 0 {
+				switch msg.cmd {
+				case cmdCancelPending, cmdDisconnected:
+					targetcall = "" // Reset
+				case cmdTarget:
+					targetcall = msg.String()
+				case cmdConnected:
+					if targetcall == "" {
+						// This can not be an incoming connection.
+						// Incoming connections always gets cmdTarget before cmdConnected according to the spec
+						continue
+					}
+					remotecall := msg.value.([]string)[0]
 					tnc.data = &tncConn{
 						remoteAddr: Addr{remotecall},
 						localAddr:  Addr{targetcall},
@@ -103,11 +106,9 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 						eofChan:    make(chan struct{}),
 						isTCP:      tnc.isTCP,
 					}
-
 					tnc.connected = true
 					incoming <- tnc.data
-
-					remotecall, targetcall = "", ""
+					targetcall = ""
 				}
 			}
 		}
