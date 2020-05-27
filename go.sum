@@ -1,0 +1,4 @@
+github.com/paulrosania/go-charset v0.0.0-20151028000031-621bb39fcc83 h1:XQonH5Iv5rbyIkMJOQ4xKmKHQTh8viXtRSmep5Ca5I4=
+github.com/paulrosania/go-charset v0.0.0-20151028000031-621bb39fcc83/go.mod h1:YnNlZP7l4MhyGQ4CBRwv6ohZTPrUJJZtEv4ZgADkbs4=
+github.com/tarm/goserial v0.0.0-20151007205400-b3440c3c6355 h1:Kp3kg8YL2dc75mckomrHZQTfzNyFGnaqFhJeQw4ozGc=
+github.com/tarm/goserial v0.0.0-20151007205400-b3440c3c6355/go.mod h1:jcMo2Odv5FpDA6rp8bnczbUolcICW6t54K3s9gOlgII=
