@@ -155,7 +155,7 @@ func (v *tcpVFO) GetPTT() (bool, error) {
 	switch resp {
 	case "0":
 		return false, nil
-	case "1":
+	case "1", "2", "3":
 		return true, nil
 	default:
 		return false, ErrUnexpectedValue
@@ -167,6 +167,11 @@ func (v *tcpVFO) SetPTT(on bool) error {
 	bInt := 0
 	if on == true {
 		bInt = 1
+	}
+
+	// Experimental PTT STATE 3 (https://github.com/la5nta/pat/issues/184)
+	if experimentalPTT3Enabled() {
+		bInt = 3
 	}
 
 	_, err := v.cmd(`\set_ptt %d`, bInt)
