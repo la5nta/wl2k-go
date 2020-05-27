@@ -6,7 +6,7 @@ clone_folder: c:\gopath\src\github.com\la5nta\wl2k-go
 environment:
   global:
     GOPATH: C:\gopath
-    GOVERSION: "1.11"
+    GOVERSION: "1.14.3"
     MSYS_PATH: C:\MinGW\msys\1.0
 install:
   - set PATH=C:\go\bin;%MSYS_PATH%\bin;C:\MinGW\bin;%PATH%
@@ -15,5 +15,4 @@ install:
   - 7z x go%GOVERSION%.windows-386.zip -y -oC:\ > NUL
 build_script:
   - go version
-  - git submodule update --init --recursive
   - go test -v ./...
