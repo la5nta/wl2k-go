@@ -138,10 +138,11 @@ func (m *Message) Validate() error {
 		return ValidationError{HEADER_SUBJECT, "Subject too long"}
 	}
 
-	// The CMS seems to except this, but according to the winlink.org/B2F document it is not allowed:
+	// The CMS seems to accept this, but according to the winlink.org/B2F document it is not allowed:
 	//  "... and the file name (up to 50 characters) of the original file."
+	// WDT made an amendment to the B2F specification 2020-05-27: New limit is 255 characters.
 	for _, f := range m.Files() {
-		if len(f.Name()) > 50 {
+		if len(f.Name()) > 255 {
 			return ValidationError{"Files", fmt.Sprintf("Attachment file name too long: %s", f.Name())}
 		}
 	}
