@@ -51,22 +51,8 @@ func (s *Session) handshake(rw io.ReadWriter) error {
 	s.remoteSID = hs.SID
 	s.remoteFW = hs.FW
 
-	var secureResp string
-	if hs.SecureChallenge != "" {
-		if s.secureLoginHandleFunc == nil {
-			return errors.New("Got secure login challenge, please register a SecureLoginHandleFunc.")
-		}
-
-		password, err := s.secureLoginHandleFunc()
-		if err != nil {
-			return err
-		}
-
-		secureResp = secureLoginResponse(hs.SecureChallenge, password)
-	}
-
 	if !s.master {
-		return s.sendHandshake(rw, secureResp)
+		return s.sendHandshake(rw, hs.SecureChallenge)
 	} else {
 		return nil
 	}
@@ -127,17 +113,30 @@ func (s *Session) readHandshake() (handshakeData, error) {
 	}
 }
 
-func (s *Session) sendHandshake(writer io.Writer, secureResp string) error {
+func (s *Session) sendHandshake(writer io.Writer, secureChallenge string) error {
+	if secureChallenge != "" && s.secureLoginHandleFunc == nil {
+		return errors.New("Got secure login challenge, please register a SecureLoginHandleFunc.")
+	}
+
 	w := bufio.NewWriter(writer)
 
 	// Request messages on behalf of every localFW
 	fmt.Fprintf(w, ";FW:")
 	for i, addr := range s.localFW {
-		// Include passwordhash for auxiliary calls (required by WL2K-4.x or later)
-		if secureResp != "" && i > 0 {
-			//TODO: Add support for individual passwords
-			fmt.Fprintf(w, " %s|%s", addr.Addr, secureResp)
-		} else {
+		switch {
+		case secureChallenge != "" && i > 0:
+			// Include passwordhash for auxiliary addresses (required by WL2K-4.x or later)
+			if password, _ := s.secureLoginHandleFunc(addr); password != "" {
+				resp := secureLoginResponse(secureChallenge, password)
+				// In the B2F specs they use space as delimiter, but Winlink Express uses pipe.
+				// I'm not sure space as a delimiter would even work when passwords for aux addresses
+				// are optional (according to the very same document).
+				fmt.Fprintf(w, " %s|%s", addr.Addr, resp)
+				break
+			}
+			// Password is not required for all aux addresses according to Winlink's B2F specs.
+			fallthrough
+		default:
 			fmt.Fprintf(w, " %s", addr.Addr)
 		}
 	}
@@ -145,8 +144,13 @@ func (s *Session) sendHandshake(writer io.Writer, secureResp string) error {
 
 	writeSID(w, s.ua.Name, s.ua.Version)
 
-	if secureResp != "" {
-		writeSecureLoginResponse(w, secureResp)
+	if secureChallenge != "" {
+		password, err := s.secureLoginHandleFunc(s.localFW[0])
+		if err != nil {
+			return err
+		}
+		resp := secureLoginResponse(secureChallenge, password)
+		writeSecureLoginResponse(w, resp)
 	}
 
 	fmt.Fprintf(w, "; %s DE %s (%s)", s.targetcall, s.mycall, s.locator)

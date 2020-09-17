@@ -80,7 +80,7 @@ type Session struct {
 	statusUpdater StatusUpdater
 
 	// Callback when secure login password is needed
-	secureLoginHandleFunc func() (password string, err error)
+	secureLoginHandleFunc func(addr Address) (password string, err error)
 
 	master     bool
 	robustMode robustMode
@@ -312,7 +312,7 @@ func (s *Session) Mycall() string { return s.mycall }
 func (s *Session) Targetcall() string { return s.targetcall }
 
 // SetSecureLoginHandleFunc registers a callback function used to prompt for password when a secure login challenge is received.
-func (s *Session) SetSecureLoginHandleFunc(f func() (password string, err error)) {
+func (s *Session) SetSecureLoginHandleFunc(f func(addr Address) (password string, err error)) {
 	s.secureLoginHandleFunc = f
 }
 
