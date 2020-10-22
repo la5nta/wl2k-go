@@ -40,6 +40,12 @@ type VFO interface {
 	// Sets the dial frequency for this VFO.
 	SetFreq(f int) error
 
+	// Gets the modulation mode of the VFO, "usb" or "lsb" (for now)
+	GetModeAsString() (rigmode, bandwidth string, err error)
+
+	// Sets the modulation mode and passband of the VFO.
+	SetModeAsString(rigmode, bandwidth string) error
+
 	// GetPTT returns the PTT state for this VFO.
 	GetPTT() (bool, error)
 

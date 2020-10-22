@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log" // DJC
 	"net"
 	"net/textproto"
 	"strconv"
@@ -58,7 +59,8 @@ func OpenTCP(addr string) (*TCPRig, error) {
 // Ping checks that a connection to rigctld is open and valid.
 //
 // If no connection is active, it will try to establish one.
-func (r *TCPRig) Ping() error { _, err := r.cmd(`dump_caps`); return err }
+func (r *TCPRig) Ping() error { _, err := r.cmd(`\get_info`, 1); return err } // Should return something for any rig.
+//func (r *TCPRig) Ping() error { _, err := r.cmd(`dump_caps`, 1); return err } //DJC TODO: no prefix on dump_caps == doesn't work!
 
 func (r *TCPRig) dial() (err error) {
 	r.mu.Lock()
@@ -117,21 +119,21 @@ func (r *TCPRig) VFOB() (VFO, error) {
 }
 
 func (r *TCPRig) VFOMode() (bool, error) {
-	resp, err := r.cmd(`\chk_vfo`)
+	resp, err := r.cmd(`\chk_vfo`, 1)
 	if err != nil {
 		return false, err
 	}
-	return resp == "CHKVFO 1", nil
+	return resp[0] == "CHKVFO 1", nil
 }
 
-// Gets the dial frequency for this VFO.
+// Gets the dial frequency in Hz for this VFO.
 func (v *tcpVFO) GetFreq() (int, error) {
-	resp, err := v.cmd(`\get_freq`)
+	resp, err := v.cmd(`\get_freq`, 1)
 	if err != nil {
 		return -1, err
 	}
 
-	freq, err := strconv.Atoi(resp)
+	freq, err := strconv.Atoi(resp[0])
 	if err != nil {
 		return -1, err
 	}
@@ -141,18 +143,36 @@ func (v *tcpVFO) GetFreq() (int, error) {
 
 // Sets the dial frequency for this VFO.
 func (v *tcpVFO) SetFreq(freq int) error {
-	_, err := v.cmd(`\set_freq %d`, freq)
+	_, err := v.cmd(`\set_freq %d`, 0, freq)
+	return err
+}
+
+func (v *tcpVFO) GetModeAsString() (rigmode, bandwidth string, err error) {
+	// Query the VFO and return the modulation mode and bandwidth.
+	// 'rigmode' is the mode as a string (defined by hamlib).
+	// 'bandwidth' is the passband width in Hz.
+	var modeBW []string
+	modeBW, err = v.cmd(`\get_mode`, 2)
+	if err != nil {
+		return "", "", err
+	}
+	return modeBW[0], modeBW[1], nil
+}
+
+func (v *tcpVFO) SetModeAsString(rigmode, bandwidth string) (err error) {
+	log.Printf("DJC SetModeAsString rigmode:%s bandwidth:%s", rigmode, bandwidth)
+	_, err = v.cmd(`\set_mode %s %s`, 0, rigmode, bandwidth)
 	return err
 }
 
 // GetPTT returns the PTT state for this VFO.
 func (v *tcpVFO) GetPTT() (bool, error) {
-	resp, err := v.cmd("t")
+	resp, err := v.cmd("t", 1)
 	if err != nil {
 		return false, err
 	}
 
-	switch resp {
+	switch resp[0] {
 	case "0":
 		return false, nil
 	case "1", "2", "3":
@@ -167,28 +187,29 @@ func (v *tcpVFO) SetPTT(on bool) error {
 	bInt := 0
 	if on == true {
 		bInt = 1
+
+		// Experimental PTT STATE 3 (https://github.com/la5nta/pat/issues/184)
+		if experimentalPTT3Enabled() {
+			bInt = 3
+		}
 	}
 
-	// Experimental PTT STATE 3 (https://github.com/la5nta/pat/issues/184)
-	if experimentalPTT3Enabled() {
-		bInt = 3
-	}
-
-	_, err := v.cmd(`\set_ptt %d`, bInt)
+	_, err := v.cmd(`\set_ptt %d`, 0, bInt)
 	return err
 }
 
-func (v *tcpVFO) cmd(format string, args ...interface{}) (string, error) {
+func (v *tcpVFO) cmd(format string, nresults int, args ...interface{}) ([]string, error) {
 	// Add VFO argument (if set)
+	log.Printf("DJC VFO.cmd() format:%s nresults:%d args:%v", format, nresults, args)
 	if v.prefix != "" {
 		parts := strings.Split(format, " ")
 		parts = append([]string{parts[0], v.prefix}, parts[1:]...)
 		format = strings.Join(parts, " ")
 	}
-	return v.r.cmd(format, args...)
+	return v.r.cmd(format, nresults, args...)
 }
 
-func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error) {
+func (r *TCPRig) cmd(format string, nresults int, args ...interface{}) (resp []string, err error) {
 	// Retry
 	for i := 0; i < 3; i++ {
 		if r.conn == nil {
@@ -198,7 +219,7 @@ func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error
 			}
 		}
 
-		resp, err = r.doCmd(format, args...)
+		resp, err = r.doCmd(format, nresults, args...)
 		if err == nil {
 			break
 		}
@@ -211,47 +232,95 @@ func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error
 	return resp, err
 }
 
-func (r *TCPRig) doCmd(format string, args ...interface{}) (string, error) {
+func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (results []string, err error) {
+	// Execute a hamlib command in 'string', expecting 'nresults' values returned, using 'args'
+	// Returns a slice with the data in the order returned by the command, if any; if none then empty slice.
+
 	r.tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
 	id, err := r.conn.Cmd(format, args...)
 	r.tcpConn.SetDeadline(time.Time{})
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	r.conn.StartResponse(id)
 	defer r.conn.EndResponse(id)
 
 	r.tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
-	resp, err := r.conn.ReadLine()
+
+	// Using the hamlib regular protocol.
+	// Set commands return no data but 'RPRT 0' for success.
+	// 'RPRT -n' is an error, 'n' being a code.
+	// Get commands return the data, one value per line, or
+	// 'RPRT -n' signalling an error.
+	var resp string
+
+	if nresults == 0 { // i.e. a 'Set' command.
+		resp, err = r.conn.ReadLine()
+		log.Printf("DJC TCPRig doCmd resp:%s", resp)
+		// A set command returns 'RPRT 0' for success or 'RPRT -n' for failure code 'n'.
+		if err == nil {
+			if !strings.HasPrefix(resp, "RPRT 0") {
+				// log.Printf("DJC TCPRig doCmd oh-oh, got non-zero RPRT %v", resp)
+				c := fmt.Sprintf(format, args...)
+				err = fmt.Errorf("Sent hamlib cmd \"%s\" but it returned error %s", c, resp)
+				// log.Printf("DJC TCPRig doCmd 1 err: %v", err)
+			}
+		}
+		// Drop out of here with err!=nil if there was a problem.
+
+	} else { // This is a Get command which will produce 'nresults' lines of output.
+		for i := 0; i < nresults; i++ {
+			resp, err = r.conn.ReadLine()
+			log.Printf("DJC TCPRig doCmd resp:%s", resp)
+			if err != nil {
+				break
+			} else if strings.HasPrefix(resp, "RPRT") {
+				// Some kind of failure. Get commands should not return RPRT 0
+				err = fmt.Errorf("Hamlib given %s but returned %s", format, resp)
+				break
+			}
+
+			results = append(results, resp)
+			log.Printf("DJC TCPRig doCmd results:%v", results)
+		}
+	}
+
+	// log.Printf("DJC TCPRig doCmd err: %v", err)
+
 	r.tcpConn.SetDeadline(time.Time{})
 
 	if err != nil {
-		return "", err
-	} else if err := toError(resp); err != nil {
-		return resp, err
+		log.Printf("DJC TCPRig doCmd returning error: %v", err)
+		return nil, err
 	}
 
-	return resp, nil
+	if nresults > 0 && len(results) != nresults {
+		return nil, fmt.Errorf("Hamlib command %s returned %d results; expected %d", format, len(results), nresults)
+	}
+
+	// ... and finally, all is good.
+	log.Printf("DJC TCPRig doCmd returning: %v", results)
+	return results, nil
 }
 
-func toError(str string) error {
-	if !strings.HasPrefix(str, "RPRT ") {
-		return nil
-	}
+// func toError(str string) error {
+// 	if !strings.HasPrefix(str, "RPRT ") {
+// 		return nil
+// 	}
 
-	parts := strings.SplitN(str, " ", 2)
+// 	parts := strings.SplitN(str, " ", 2)
 
-	code, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return err
-	}
+// 	code, err := strconv.Atoi(parts[1])
+// 	if err != nil {
+// 		return err
+// 	}
 
-	switch code {
-	case 0:
-		return nil
-	default:
-		return fmt.Errorf("code %d", code)
-	}
-}
+// 	switch code {
+// 	case 0:
+// 		return nil
+// 	default:
+// 		return fmt.Errorf("code %d", code)
+// 	}
+// }
