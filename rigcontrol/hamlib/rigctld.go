@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log" // DJC
 	"net"
 	"net/textproto"
 	"strconv"
@@ -160,7 +159,6 @@ func (v *tcpVFO) GetModeAsString() (rigmode, bandwidth string, err error) {
 }
 
 func (v *tcpVFO) SetModeAsString(rigmode, bandwidth string) (err error) {
-	log.Printf("DJC SetModeAsString rigmode:%s bandwidth:%s", rigmode, bandwidth)
 	_, err = v.cmd(`\set_mode %s %s`, 0, rigmode, bandwidth)
 	return err
 }
@@ -200,7 +198,6 @@ func (v *tcpVFO) SetPTT(on bool) error {
 
 func (v *tcpVFO) cmd(format string, nresults int, args ...interface{}) ([]string, error) {
 	// Add VFO argument (if set)
-	log.Printf("DJC VFO.cmd() format:%s nresults:%d args:%v", format, nresults, args)
 	if v.prefix != "" {
 		parts := strings.Split(format, " ")
 		parts = append([]string{parts[0], v.prefix}, parts[1:]...)
@@ -258,14 +255,11 @@ func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (result
 
 	if nresults == 0 { // i.e. a 'Set' command.
 		resp, err = r.conn.ReadLine()
-		log.Printf("DJC TCPRig doCmd resp:%s", resp)
 		// A set command returns 'RPRT 0' for success or 'RPRT -n' for failure code 'n'.
 		if err == nil {
 			if !strings.HasPrefix(resp, "RPRT 0") {
-				// log.Printf("DJC TCPRig doCmd oh-oh, got non-zero RPRT %v", resp)
 				c := fmt.Sprintf(format, args...)
 				err = fmt.Errorf("Sent hamlib cmd \"%s\" but it returned error %s", c, resp)
-				// log.Printf("DJC TCPRig doCmd 1 err: %v", err)
 			}
 		}
 		// Drop out of here with err!=nil if there was a problem.
@@ -273,7 +267,6 @@ func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (result
 	} else { // This is a Get command which will produce 'nresults' lines of output.
 		for i := 0; i < nresults; i++ {
 			resp, err = r.conn.ReadLine()
-			log.Printf("DJC TCPRig doCmd resp:%s", resp)
 			if err != nil {
 				break
 			} else if strings.HasPrefix(resp, "RPRT") {
@@ -283,16 +276,12 @@ func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (result
 			}
 
 			results = append(results, resp)
-			log.Printf("DJC TCPRig doCmd results:%v", results)
 		}
 	}
-
-	// log.Printf("DJC TCPRig doCmd err: %v", err)
 
 	r.tcpConn.SetDeadline(time.Time{})
 
 	if err != nil {
-		log.Printf("DJC TCPRig doCmd returning error: %v", err)
 		return nil, err
 	}
 
@@ -301,7 +290,6 @@ func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (result
 	}
 
 	// ... and finally, all is good.
-	log.Printf("DJC TCPRig doCmd returning: %v", results)
 	return results, nil
 }
 
