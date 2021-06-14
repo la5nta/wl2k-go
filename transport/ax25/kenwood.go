@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/albenik/go-serial/v2"
 	"github.com/la5nta/wl2k-go/fbb"
-	"github.com/tarm/goserial"
 )
 
 // KenwoodConn implements net.Conn using a
@@ -51,8 +51,7 @@ func DialKenwood(dev, mycall, targetcall string, config Config, logger *log.Logg
 		}
 		conn.Conn.ReadWriteCloser = c
 	} else {
-		c := &serial.Config{Name: dev, Baud: int(B9600)}
-		s, err := serial.OpenPort(c)
+		s, err := serial.Open(dev, serial.WithBaudrate(9600))
 		if err != nil {
 			return conn, err
 		} else {
