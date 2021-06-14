@@ -6,7 +6,7 @@ os:
 
 go:
   - 1.x
-  - 1.11
+  - 1.16
   - tip
 
 script:
@@ -15,6 +15,6 @@ script:
 matrix:
   exclude:
     - os: osx
-      go: 1.11
+      go: 1.16
   allow_failures:
     - go: tip
