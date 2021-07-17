@@ -57,6 +57,7 @@ func TestSessionCMS(t *testing.T) {
 	}()
 
 	fmt.Fprint(srv, "[WL2K-2.8.4.8-B2FWIHJM$]\r")
+	fmt.Fprint(srv, "Foobar should be ignored\r")
 	fmt.Fprint(srv, "Test CMS >\r")
 
 	expectLines := []string{

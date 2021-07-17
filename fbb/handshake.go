@@ -68,10 +68,9 @@ func (s *Session) readHandshake() (handshakeData, error) {
 	data := handshakeData{}
 
 	for {
-		bytes, err := s.rd.Peek(1)
-		if err != nil {
+		if bytes, err := s.rd.Peek(1); err != nil {
 			return data, err
-		} else if bytes[0] == 'F' {
+		} else if bytes[0] == 'F' && s.master {
 			return data, nil // Next line is a protocol command, handshake is done
 		}
 
