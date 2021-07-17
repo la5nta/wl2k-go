@@ -370,10 +370,14 @@ func (s *Session) outbound() []*Proposal {
 		props = append(props, prop)
 	}
 
-	// Sort the proposals by size, smallest first as suggested by the Winlink FAQ Q460.
-	sort.Sort(bySize(props))
-
+	sortProposals(props)
 	return props
+}
+
+func sortProposals(props []*Proposal) {
+	// sort first by ascending size, then stable sort by descending precedence
+	sort.Sort(bySize(props))
+	sort.Stable(byPrecedence(props))
 }
 
 type bySize []*Proposal
@@ -385,6 +389,14 @@ func (s bySize) Less(i, j int) bool {
 		return s[i].compressedSize < s[j].compressedSize
 	}
 	return s[i].MID() < s[j].MID()
+}
+
+type byPrecedence []*Proposal
+
+func (s byPrecedence) Len() int      { return len(s) }
+func (s byPrecedence) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s byPrecedence) Less(i, j int) bool {
+	return s[i].precedence() < s[j].precedence()
 }
 
 func (s *Session) highestPropCode() PropCode {

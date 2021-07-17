@@ -187,3 +187,51 @@ func TestSessionCMSv4(t *testing.T) {
 		t.Errorf("Session exchange returned error: %s", err)
 	}
 }
+
+func TestSortProposals(t *testing.T) {
+	props := []*Proposal{
+		mustProposalWithSubject("Just a test"),
+		mustProposalWithSubject("Re://WL2K O/Very important"),
+		mustProposalWithSubject("//WL2K R/Read this sometime, or don't"),
+		mustProposalWithSubject("//WL2K P/ Pretty important"),
+		mustProposalWithSubject("//WL2K Z/The world is on fire!"),
+	}
+
+	sortProposals(props)
+
+	// Flash
+	if props[0].Title() != "//WL2K Z/The world is on fire!" {
+		t.Error("Flash precedence was not in order")
+	}
+	// Immediate
+	if props[1].Title() != "Re://WL2K O/Very important" {
+		t.Error("Immediate precedence was not in order")
+	}
+	// Priority
+	if props[2].Title() != "//WL2K P/ Pretty important" {
+		t.Error("Priority precedence was not in order")
+	}
+	// Everything else is Routine, so goes by increasing size
+	if props[3].Title() != "Just a test" {
+		t.Error("Routine precedence was not in order")
+	}
+	if props[4].Title() != "//WL2K R/Read this sometime, or don't" {
+		t.Error("Routine precedence was not in order")
+	}
+}
+
+func mustProposalWithSubject(subject string) *Proposal {
+	p, err := proposalWithSubject(subject)
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+
+func proposalWithSubject(subject string) (*Proposal, error) {
+	msg := NewMessage(Private, "N0CALL")
+	msg.AddTo("N0CALL")
+	msg.SetSubject(subject)
+	_ = msg.SetBody("Satisfies validation")
+	return msg.Proposal(BasicProposal)
+}
