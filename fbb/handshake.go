@@ -86,7 +86,8 @@ func (s *Session) readHandshake() (handshakeData, error) {
 		// to ensure we disconnect early if the remote is not talking the expected
 		// protocol. (We should at least allow unknown ; prefixed lines aka "comments")
 		switch {
-		case strings.Contains(line, `[`): // Header with sid (ie. [WL2K-2.8.4.8-B2FWIHJM$])
+		// Header with sid (ie. [WL2K-2.8.4.8-B2FWIHJM$])
+		case isSID(line):
 			data.SID, err = parseSID(line)
 			if err != nil {
 				return data, err
@@ -214,6 +215,10 @@ func writeSID(w io.Writer, appName, appVersion string) error {
 func writeSecureLoginResponse(w io.Writer, response string) error {
 	_, err := fmt.Fprintf(w, ";PR: %s\r", response)
 	return err
+}
+
+func isSID(str string) bool {
+	return strings.HasPrefix(str, `[`) && strings.HasSuffix(str, `]`)
 }
 
 func parseSID(str string) (sid, error) {
