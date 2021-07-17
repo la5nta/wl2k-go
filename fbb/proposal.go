@@ -197,3 +197,26 @@ func parseB2Proposal(line string, prop *Proposal) (err error) {
 	}
 	return
 }
+
+// precedence returns the priority level of the message. Lower precedence value is more important
+// and should be handled sooner.
+//
+// See https://www.winlink.org/content/how_use_message_precedence_precedence.
+func (p *Proposal) precedence() int {
+	const (
+		Flash = iota
+		Immediate
+		Priority
+		Routine
+	)
+	switch {
+	case strings.Contains(p.title, "//WL2K Z/"):
+		return Flash
+	case strings.Contains(p.title, "//WL2K O/"):
+		return Immediate
+	case strings.Contains(p.title, "//WL2K P/"):
+		return Priority
+	default:
+		return Routine
+	}
+}
