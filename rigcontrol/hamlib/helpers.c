@@ -6,6 +6,8 @@
 // +build libhamlib
 
 #include <hamlib/rig.h>
+extern void rigListCb();
+
 
 void setBaudRate(RIG *r, int rate) {
 	r->state.rigport.parm.serial.rate = rate;

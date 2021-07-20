@@ -45,6 +45,29 @@ type VFO interface {
 
 	// Enable (or disable) PTT on this VFO.
 	SetPTT(on bool) error
+
+	// Set VFO modulation mode to 'm' using passband width 'pbw' in Hz, or rig default if 'pbw' is zero.
+	SetMode(m Mode, pbw int) error
+
+	// Get the modulation mode and passband width in Hz that this VFO is set to.
+	GetMode() (m Mode, pwb int, err error)
+}
+
+// ModeToString converts a enum mode as returned from hamlib into a string.
+func ModeToString(m Mode) string {
+	return ModeString[m] // Yes, ignoring unlikely possible error.
+}
+
+// StringToMode converts a string representation of a rig mode into a hamlib enum mode
+// returning a non-nil error if it can't do that.
+func StringToMode(s string) (m Mode, err error) {
+	for mkey := range ModeString {
+		val := ModeString[mkey]
+		if val == s {
+			return mkey, nil
+		}
+	}
+	return 0, fmt.Errorf("Invalid rig mode '%s'", s)
 }
 
 func Open(network, address string) (Rig, error) {

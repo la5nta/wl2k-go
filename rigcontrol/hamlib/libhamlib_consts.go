@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 // +build cgo
-// +build libhamlib
 
 package hamlib
 
@@ -35,6 +34,30 @@ const (
 	SAH          = C.RIG_MODE_SAH
 	DSB          = C.RIG_MODE_DSB
 )
+
+var ModeString = map[Mode]string{
+	NoMode:  "NOMODE",
+	AM:      "AM",
+	CW:      "CW",
+	USB:     "USB",
+	LSB:     "LSB",
+	RTTY:    "RTTY",
+	FM:      "FM",
+	WFM:     "WFM",
+	CWR:     "CWR",
+	RTTYR:   "RTTYR",
+	AMS:     "AMS",
+	PKTLSB:  "PKTLSB",
+	PKTUSB:  "PKTUSB",
+	PKTFM:   "PKTFM",
+	ECSSUSB: "ECSSUSB",
+	ECSSLSB: "ECSSLSB",
+	FAX:     "FAX",
+	SAM:     "SAM",
+	SAL:     "SAL",
+	SAH:     "SAH",
+	DSB:     "DSB",
+}
 
 type PowerState int
 
