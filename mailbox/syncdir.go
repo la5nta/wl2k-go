@@ -169,6 +169,7 @@ func (h *DirHandler) GetOutbound(fws ...fbb.Address) []*fbb.Message {
 	return deliver
 }
 
+// Deprecated: implementers should choose their own directories
 func DefaultMailboxPath() (string, error) {
 	appdir, err := DefaultAppDir()
 	if err != nil {
@@ -177,6 +178,7 @@ func DefaultMailboxPath() (string, error) {
 	return path.Join(appdir, "mailbox"), nil
 }
 
+// Deprecated: implementers should choose their own directories
 func DefaultAppDir() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
