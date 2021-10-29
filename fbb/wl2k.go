@@ -217,20 +217,20 @@ func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 	// The given conn should always be closed after returning from this method.
 	// If an error occurred, echo it to the remote.
 	defer func() {
-		if err == nil {
+		switch {
+		case err == nil:
+			// Success :-)
 			return
-		}
-
-		// In case another go-routine closes the connection...
-		localEOF := strings.Contains(err.Error(), "use of closed network connection")
-		if localEOF {
-			err = io.EOF
-		}
-
-		switch err {
-		case io.EOF, io.ErrUnexpectedEOF:
+		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			// Connection closed prematurely by modem (link failure) or
+			// remote peer.
+			err = ErrConnLost
+		case errors.Is(err, net.ErrClosed):
+			// Closed locally, but still...
 			err = ErrConnLost
 		default:
+			// Probably a protocol related error.
+			// Echo the error to the remote peer and disconnect.
 			conn.SetDeadline(time.Now().Add(time.Minute))
 			fmt.Fprintf(conn, "*** %s\r\n", err)
 			conn.Close()
