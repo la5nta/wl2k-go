@@ -164,7 +164,7 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 	}
 
 	if err = parseProposalAnswer(reply, outbound, s.log); err != nil {
-		return sent, fmt.Errorf("Unable to parse proposal answer: %s", err)
+		return sent, fmt.Errorf("Unable to parse proposal answer: %w", err)
 	}
 
 	if len(outbound) == 0 {
@@ -224,7 +224,7 @@ Loop:
 
 			prop := new(Proposal)
 			if err = parseProposal(line, prop); err != nil {
-				err = errors.New(`Unable to parse proposal: ` + err.Error())
+				err = fmt.Errorf("Unable to parse proposal: %w", err)
 				return
 			}
 			proposals = append(proposals, prop)
@@ -528,7 +528,7 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	// Read proposal title.
 	title, err := s.rd.ReadString(_CHRNUL)
 	if err != nil {
-		return errors.New(`Unable to parse title: ` + err.Error())
+		return fmt.Errorf("Unable to parse title: %w", err)
 	}
 	title = title[:len(title)-1] // Remove _CHRNUL
 
@@ -539,7 +539,7 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	// Read offset part
 	var offsetStr string
 	if offsetStr, err = s.rd.ReadString(_CHRNUL); err != nil {
-		return errors.New(`Unable to parse offset: ` + err.Error())
+		return fmt.Errorf("Unable to parse offset: %w", err)
 	} else {
 		offsetStr = offsetStr[:len(offsetStr)-1]
 	}
@@ -554,7 +554,7 @@ func (s *Session) readCompressed(rw io.ReadWriter, p *Proposal) (err error) {
 	offset, err := strconv.Atoi(offsetStr)
 	switch {
 	case err != nil:
-		return fmt.Errorf("Offset header not parseable as integer: %s", err)
+		return fmt.Errorf("Offset header not parseable as integer: %w", err)
 	case offset != p.offset:
 		return fmt.Errorf(`Expected offset %d, got %d`, p.offset, offset)
 	}
