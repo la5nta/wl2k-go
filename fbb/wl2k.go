@@ -9,6 +9,7 @@ package fbb
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,9 @@ import (
 
 	"github.com/la5nta/wl2k-go/transport"
 )
+
+// ErrConnLost is returned by Session.Exchange if the connection is prematurely closed.
+var ErrConnLost = errors.New("connection lost")
 
 // Objects implementing the MBoxHandler interface can be used to handle inbound and outbound messages for a Session.
 type MBoxHandler interface {
@@ -202,7 +206,7 @@ func (s *Session) RemoteSID() string { return string(s.remoteSID) }
 // retrieved by calling Received().
 //
 // The connection is closed at the end of the exchange. If the connection is closed before
-// the exchange is done, is will return io.EOF.
+// the exchange is done, ErrConnLost is returned.
 //
 // Subsequent Exchange calls on the same session is a noop.
 func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
@@ -223,12 +227,13 @@ func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 			err = io.EOF
 		}
 
-		if err != io.EOF {
+		switch err {
+		case io.EOF, io.ErrUnexpectedEOF:
+			err = ErrConnLost
+		default:
 			conn.SetDeadline(time.Now().Add(time.Minute))
 			fmt.Fprintf(conn, "*** %s\r\n", err)
 			conn.Close()
-		} else {
-			err = io.ErrUnexpectedEOF
 		}
 	}()
 
