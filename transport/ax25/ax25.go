@@ -30,6 +30,11 @@ import (
 	"github.com/la5nta/wl2k-go/transport"
 )
 
+const (
+	// DefaultSerialBaud is the default serial_baud value of the serial-tnc scheme.
+	DefaultSerialBaud = 9600
+)
+
 const _NETWORK = "AX.25"
 
 var DefaultDialer = &Dialer{Timeout: 45 * time.Second}
@@ -124,18 +129,22 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 	case "ax25":
 		return DialAX25Timeout(url.Host, url.User.Username(), target, d.Timeout)
 	case "serial-tnc":
-		//TODO: This is some badly designed legacy stuff. Need to re-think the whole
-		//serial-tnc scheme. See issue #34.
-		baudrate := Baudrate(1200)
+		// TODO: This is some badly designed legacy stuff. Need to re-think the whole
+		// serial-tnc scheme. See issue #34.
+		hbaud := HBaud(1200)
 		if i, _ := strconv.Atoi(url.Params.Get("hbaud")); i > 0 {
-			baudrate = Baudrate(i)
+			hbaud = HBaud(i)
+		}
+		serialBaud := DefaultSerialBaud
+		if i, _ := strconv.Atoi(url.Params.Get("serial_baud")); i > 0 {
+			serialBaud = i
 		}
 
 		return DialKenwood(
 			url.Host,
 			url.User.Username(),
 			target,
-			NewConfig(baudrate),
+			NewConfig(hbaud, serialBaud),
 			nil,
 		)
 	default:
@@ -161,5 +170,4 @@ func (a Address) String() string {
 	} else {
 		return a.Call
 	}
-
 }

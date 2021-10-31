@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	B9600 Baudrate = 9600
-	B1200          = 1200
+	B9600 HBaud = 9600
+	B1200       = 1200
 )
 
 const (
@@ -29,10 +29,11 @@ type tncAddr struct {
 func (a tncAddr) Digis() []Address { return a.digis }
 func (a tncAddr) Address() Address { return a.address }
 
-type Baudrate int
+type HBaud int
 
 type Config struct {
-	HBaud        Baudrate      // Baudrate for packet channel [1200/9600].
+	HBaud        HBaud         // Baudrate for packet channel [1200/9600].
+	SerialBaud   int           // Baudrate for the serial port.
 	TXDelay      time.Duration // Time delay between PTT ON and start of transmission [(0 - 120) * 10ms].
 	PacketLength uint8         // Maximum length of the data portion of a packet [0 - 255 bytes].
 	Persist      uint8         // Parameter to calculate probability for the PERSIST/SLOTTIME method [0-255].
@@ -42,11 +43,12 @@ type Config struct {
 	ResponseTime time.Duration // ACK-packet transmission delay [0-255 * 100ms].
 }
 
-func NewConfig(baud Baudrate) Config {
-	switch baud {
+func NewConfig(hbaud HBaud, serialBaud int) Config {
+	switch hbaud {
 	case B1200:
 		return Config{
 			HBaud:        B1200,
+			SerialBaud:   serialBaud,
 			TXDelay:      120 * time.Millisecond,
 			PacketLength: 128,
 			Persist:      128,
@@ -58,6 +60,7 @@ func NewConfig(baud Baudrate) Config {
 	case B9600:
 		return Config{
 			HBaud:        B9600,
+			SerialBaud:   serialBaud,
 			TXDelay:      100 * time.Millisecond,
 			PacketLength: 255,
 			Persist:      190,
@@ -70,7 +73,7 @@ func NewConfig(baud Baudrate) Config {
 	return Config{}
 }
 
-//TODO:review and improve
+// TODO:review and improve
 func tncAddrFromString(str string) tncAddr {
 	parts := strings.Split(str, " ")
 	addr := tncAddr{

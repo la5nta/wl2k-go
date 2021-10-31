@@ -51,7 +51,7 @@ func DialKenwood(dev, mycall, targetcall string, config Config, logger *log.Logg
 		}
 		conn.Conn.ReadWriteCloser = c
 	} else {
-		s, err := serial.Open(dev, serial.WithBaudrate(9600))
+		s, err := serial.Open(dev, serial.WithBaudrate(config.SerialBaud))
 		if err != nil {
 			return conn, err
 		} else {
