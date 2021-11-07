@@ -62,5 +62,5 @@ func strToState(str string) (State, bool) {
 }
 
 func debugEnabled() bool {
-	return os.Getenv("winmor_debug") != ""
+	return os.Getenv("WINMOR_DEBUG") != ""
 }

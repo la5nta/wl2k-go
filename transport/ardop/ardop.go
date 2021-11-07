@@ -98,5 +98,5 @@ func strToState(str string) (State, bool) {
 }
 
 func debugEnabled() bool {
-	return os.Getenv("ardop_debug") != ""
+	return os.Getenv("ARDOP_DEBUG") != ""
 }
