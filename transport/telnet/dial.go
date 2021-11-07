@@ -21,7 +21,7 @@ const (
 	CMSAddress    = "server.winlink.org:8772"
 )
 
-var DefaultDialer = &Dialer{Timeout: 10 * time.Second}
+var DefaultDialer = &Dialer{Timeout: 30 * time.Second}
 
 func init() {
 	transport.RegisterDialer("telnet", DefaultDialer)
