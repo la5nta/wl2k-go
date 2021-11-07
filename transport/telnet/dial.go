@@ -49,6 +49,8 @@ func DialCMS(mycall string) (net.Conn, error) {
 type Dialer struct{ Timeout time.Duration }
 
 // DialURL dials telnet:// URLs
+//
+// The URL parameter dial_timeout can be used to set a custom dial timeout interval. E.g. "2m".
 func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 	if url.Scheme != "telnet" {
 		return nil, transport.ErrUnsupportedScheme
@@ -60,7 +62,15 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 		user = url.User.Username()
 	}
 
-	return DialTimeout(url.Host, user, pass, d.Timeout)
+	timeout := d.Timeout
+	if str := url.Params.Get("dial_timeout"); str != "" {
+		dur, err := time.ParseDuration(str)
+		if err != nil {
+			return nil, fmt.Errorf("invalid dial_timeout value: %w", err)
+		}
+		timeout = dur
+	}
+	return DialTimeout(url.Host, user, pass, timeout)
 }
 
 func Dial(addr, mycall, password string) (net.Conn, error) {
