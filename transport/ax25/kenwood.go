@@ -59,57 +59,103 @@ func DialKenwood(dev, mycall, targetcall string, config Config, logger *log.Logg
 		}
 	}
 
-	conn.Write([]byte{3, 3, 3}) // ETX
-	fmt.Fprint(conn, "\r\nrestart\r\n")
-	for {
-		line, _ := fbb.ReadLine(conn)
+	// Initialize the TNC (with timeout)
+	initErr := make(chan error, 1)
+	go func() {
+		defer close(initErr)
+		conn.Write([]byte{3, 3, 3}) // ETX
+		fmt.Fprint(conn, "\r\nrestart\r\n")
+		// Wait for prompt, then send all the init commands
+		for {
+			line, err := fbb.ReadLine(conn)
+			if err != nil {
+				conn.Close()
+				initErr <- err
+				return
+			}
 
-		if strings.HasPrefix(line, "cmd:") {
-			fmt.Fprint(conn, "ECHO OFF\r") // Don't echo commands
-			fmt.Fprint(conn, "FLOW OFF\r")
-			fmt.Fprint(conn, "XFLOW ON\r")    // Enable software flow control
-			fmt.Fprint(conn, "LFIGNORE ON\r") // Ignore linefeed (\n)
-			fmt.Fprint(conn, "AUTOLF OFF\r")  // Don't auto-insert linefeed
-			fmt.Fprint(conn, "CR ON\r")
-			fmt.Fprint(conn, "8BITCONV ON\r") // Use 8-bit characters
+			if strings.HasPrefix(line, "cmd:") {
+				fmt.Fprint(conn, "ECHO OFF\r") // Don't echo commands
+				fmt.Fprint(conn, "FLOW OFF\r")
+				fmt.Fprint(conn, "XFLOW ON\r")    // Enable software flow control
+				fmt.Fprint(conn, "LFIGNORE ON\r") // Ignore linefeed (\n)
+				fmt.Fprint(conn, "AUTOLF OFF\r")  // Don't auto-insert linefeed
+				fmt.Fprint(conn, "CR ON\r")
+				fmt.Fprint(conn, "8BITCONV ON\r") // Use 8-bit characters
 
-			// Return to command mode if station of current I/O stream disconnects.
-			fmt.Fprint(conn, "NEWMODE ON\r")
+				// Return to command mode if station of current I/O stream disconnects.
+				fmt.Fprint(conn, "NEWMODE ON\r")
 
-			time.Sleep(500 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond)
 
-			fmt.Fprintf(conn, "MYCALL %s\r", mycall)
-			fmt.Fprintf(conn, "HBAUD %d\r", config.HBaud)
-			fmt.Fprintf(conn, "PACLEN %d\r", config.PacketLength)
-			fmt.Fprintf(conn, "TXDELAY %d\r", config.TXDelay/_CONFIG_TXDELAY_UNIT)
-			fmt.Fprintf(conn, "PERSIST %d\r", config.Persist)
-			time.Sleep(500 * time.Millisecond)
+				fmt.Fprintf(conn, "MYCALL %s\r", mycall)
+				fmt.Fprintf(conn, "HBAUD %d\r", config.HBaud)
+				fmt.Fprintf(conn, "PACLEN %d\r", config.PacketLength)
+				fmt.Fprintf(conn, "TXDELAY %d\r", config.TXDelay/_CONFIG_TXDELAY_UNIT)
+				fmt.Fprintf(conn, "PERSIST %d\r", config.Persist)
+				time.Sleep(500 * time.Millisecond)
 
-			fmt.Fprintf(conn, "SLOTTIME %d\r", config.SlotTime/_CONFIG_SLOT_TIME_UNIT)
-			fmt.Fprint(conn, "FULLDUP OFF\r")
-			fmt.Fprintf(conn, "MAXFRAME %d\r", config.MaxFrame)
-			fmt.Fprintf(conn, "FRACK %d\r", config.FRACK/_CONFIG_FRACK_UNIT)
-			fmt.Fprintf(conn, "RESPTIME %d\r", config.ResponseTime/_CONFIG_RESPONSE_TIME_UNIT)
-			fmt.Fprintf(conn, "NOMODE ON\r")
+				fmt.Fprintf(conn, "SLOTTIME %d\r", config.SlotTime/_CONFIG_SLOT_TIME_UNIT)
+				fmt.Fprint(conn, "FULLDUP OFF\r")
+				fmt.Fprintf(conn, "MAXFRAME %d\r", config.MaxFrame)
+				fmt.Fprintf(conn, "FRACK %d\r", config.FRACK/_CONFIG_FRACK_UNIT)
+				fmt.Fprintf(conn, "RESPTIME %d\r", config.ResponseTime/_CONFIG_RESPONSE_TIME_UNIT)
+				fmt.Fprintf(conn, "NOMODE ON\r")
 
-			break
+				break
+			}
+		}
+	}()
+	select {
+	case <-time.After(3 * time.Second):
+		conn.Close()
+		return nil, fmt.Errorf("initialization failed: deadline exceeded")
+	case err := <-initErr:
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("initialization failed: %w", err)
 		}
 	}
 	time.Sleep(2 * time.Second)
 
-	fmt.Fprintf(conn, "\rc %s\r", targetcall)
-	for {
-		line, _ := fbb.ReadLine(conn)
-		logger.Println(line)
-		line = strings.TrimSpace(line)
+	// Dial the connection (with timeout)
+	dialErr := make(chan error, 1)
+	go func() {
+		defer close(dialErr)
+		fmt.Fprintf(conn, "\rc %s\r", targetcall)
+		// Wait for connect acknowledgement
+		for {
+			line, err := fbb.ReadLine(conn)
+			if err != nil {
+				dialErr <- err
+				return
+			}
+			logger.Println(line)
+			line = strings.TrimSpace(line)
 
-		if strings.Contains(line, "*** CONNECTED to") {
-			fmt.Fprint(conn, "TRANS\r\n")
-			return conn, nil
-		} else if strings.Contains(line, "*** DISCONNECTED") {
-			logger.Fatal("got disconnect ", int(line[len(line)-1]))
+			switch {
+			case strings.Contains(line, "*** DISCONNECTED"):
+				dialErr <- fmt.Errorf("got disconnect %d", int(line[len(line)-1]))
+				return
+			case strings.Contains(line, "*** CONNECTED to"):
+				return
+			}
+		}
+	}()
+	select {
+	case <-time.After(5 * time.Minute):
+		conn.Close()
+		return nil, fmt.Errorf("connect failed: deadline exceeded")
+	case err := <-initErr:
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("connect failed: %w", err)
 		}
 	}
+
+	// Success! Switch to TRANSPARENT mode and return the connection
+	fmt.Fprint(conn, "TRANS\r\n")
+	return conn, nil
 }
 
 func (c *KenwoodConn) Close() error {
