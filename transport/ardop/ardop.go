@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -45,6 +47,7 @@ var (
 	ErrConnectTimeout       = errors.New("Connect timeout")
 	ErrChecksumMismatch     = errors.New("Control protocol checksum mismatch")
 	ErrTNCClosed            = errors.New("TNC closed")
+	ErrUnsupportedBandwidth = errors.New("Unsupported ARQ bandwidth")
 )
 
 // Bandwidth definitions of all supported ARQ bandwidths.
@@ -64,7 +67,23 @@ type State uint8
 // Bandwidth represents the ARQ bandwidth.
 type Bandwidth struct {
 	Forced bool // Force use of max bandwidth.
-	Max    uint // Max bandwidh to use.
+	Max    uint // Max bandwidth to use.
+}
+
+// StrToBandwidth parses a string and returns a valid Bandwidth.
+func StrToBandwidth(in string) (Bandwidth, error) {
+	re := regexp.MustCompile("^(200|500|1000|2000)(MAX|FORCED)?$")
+	matchGroup := re.FindStringSubmatch(in)
+	if len(matchGroup) < 2 {
+		return Bandwidth{}, ErrUnsupportedBandwidth
+	}
+	// regex assures that this is parsable as uint
+	bw, _ := strconv.ParseInt(matchGroup[1], 10, 32)
+	forced := false
+	if len(matchGroup) == 3 {
+		forced = matchGroup[2] == "FORCED"
+	}
+	return Bandwidth{forced, uint(bw)}, nil
 }
 
 // Stringer for Bandwidth returns a valid bandwidth parameter that can be sent to the TNC.

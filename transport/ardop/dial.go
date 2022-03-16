@@ -17,6 +17,18 @@ func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 		return nil, transport.ErrUnsupportedScheme
 	}
 
+	// Set bandwidth from the URL
+	bw := url.Params.Get("bw")
+	if bw != "" {
+		bandwidth, err := StrToBandwidth(bw)
+		if err != nil {
+			return nil, err
+		}
+		if err = tnc.SetARQBandwidth(bandwidth); err != nil {
+			return nil, err
+		}
+	}
+
 	return tnc.Dial(url.Target)
 }
 
