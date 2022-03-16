@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseBandwidth(t *testing.T) {
+func TestStrToBandwidth(t *testing.T) {
 	tests := []struct {
 		in      string
 		want    Bandwidth
