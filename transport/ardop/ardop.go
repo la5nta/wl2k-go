@@ -45,6 +45,7 @@ var (
 	ErrConnectTimeout       = errors.New("Connect timeout")
 	ErrChecksumMismatch     = errors.New("Control protocol checksum mismatch")
 	ErrTNCClosed            = errors.New("TNC closed")
+	ErrUnsupportedBandwidth = errors.New("Unsupported ARQ bandwidth")
 )
 
 // Bandwidth definitions of all supported ARQ bandwidths.
@@ -80,6 +81,37 @@ func (bw Bandwidth) String() string {
 
 // IsZero returns true if bw is it's zero value.
 func (bw Bandwidth) IsZero() bool { return bw.Max == 0 }
+
+// BandwidthFromString returns a Bandwidth representation of the given string.
+//
+// The string must be a valid ARDOP ARQ bandwidth string (e.g. "2000MAX", "2000FORCED").
+// The MAX/FORCED suffix may be omitted. Defaults to MAX.
+func BandwidthFromString(str string) (Bandwidth, error) {
+	//  Default to MAX if MAX/FORCED is not given.
+	if strings.HasSuffix(str, "0") {
+		str += "MAX"
+	}
+	for _, bw := range Bandwidths() {
+		if bw.String() == str {
+			return bw, nil
+		}
+	}
+	return Bandwidth{}, ErrUnsupportedBandwidth
+}
+
+// Bandwidths returns a list of all ARDOP ARQ bandwidths.
+func Bandwidths() []Bandwidth {
+	return []Bandwidth{
+		Bandwidth200Max,
+		Bandwidth500Max,
+		Bandwidth1000Max,
+		Bandwidth2000Max,
+		Bandwidth200Forced,
+		Bandwidth500Forced,
+		Bandwidth1000Forced,
+		Bandwidth2000Forced,
+	}
+}
 
 var stateMap = map[string]State{
 	"":        Unknown,
