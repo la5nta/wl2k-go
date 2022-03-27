@@ -302,7 +302,7 @@ func (tnc *TNC) runControlLoop() error {
 				}
 
 				if err != nil {
-					panic(err) //FIXME
+					panic(err) // FIXME
 				}
 			}
 		}
@@ -405,6 +405,18 @@ func (tnc *TNC) SetAutoBreak(on bool) error {
 // Sets the ARQ bandwidth
 func (tnc *TNC) SetARQBandwidth(bw Bandwidth) error {
 	return tnc.set(cmdARQBW, bw)
+}
+
+func (tnc *TNC) ARQBandwidth() (Bandwidth, error) {
+	str, err := tnc.getString(cmdARQBW)
+	if err != nil {
+		return Bandwidth{}, err
+	}
+	bw, err := BandwidthFromString(str)
+	if err != nil {
+		return Bandwidth{}, fmt.Errorf("invalid ARQBW response: %w", err)
+	}
+	return bw, nil
 }
 
 // Sets the ARQ timeout

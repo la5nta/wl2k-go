@@ -138,7 +138,7 @@ func parseCtrlMsg(str string) ctrlMsg {
 	case cmdAbort, cmdDisconnect, cmdClose, cmdDisconnected, cmdCRCFault, cmdPending, cmdCancelPending, cmdSendID:
 
 	// (echo-back only)
-	case cmdInitialize, cmdARQCall, cmdARQBW, cmdProtocolMode:
+	case cmdInitialize, cmdARQCall, cmdProtocolMode:
 
 	// State
 	case cmdNewState, cmdState:
@@ -146,7 +146,7 @@ func parseCtrlMsg(str string) ctrlMsg {
 
 	// string
 	case cmdFault, cmdMyCall, cmdGridSquare, cmdCapture,
-		cmdPlayback, cmdVersion, cmdTarget, cmdStatus:
+		cmdPlayback, cmdVersion, cmdTarget, cmdStatus, cmdARQBW:
 		msg.value = parts[1]
 
 	// []string (space separated)

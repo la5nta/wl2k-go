@@ -24,6 +24,7 @@ type tncConn struct {
 	eofChan  chan struct{}
 	ctrlIn   broadcaster
 	isTCP    bool
+	onClose  []func() error
 
 	remoteAddr Addr
 	localAddr  Addr
@@ -39,7 +40,7 @@ type tncConn struct {
 	nWritten int
 }
 
-//TODO: implement
+// TODO: implement
 func (conn *tncConn) SetDeadline(t time.Time) error      { return nil }
 func (conn *tncConn) SetReadDeadline(t time.Time) error  { return nil }
 func (conn *tncConn) SetWriteDeadline(t time.Time) error { return nil }
@@ -58,7 +59,7 @@ func (conn *tncConn) Read(p []byte) (int, error) {
 	}
 
 	if len(data) > len(p) {
-		panic("too large") //TODO: Handle
+		panic("too large") // TODO: Handle
 	}
 
 	for i, b := range data {
@@ -72,7 +73,7 @@ func (conn *tncConn) Write(p []byte) (int, error) {
 	conn.dataLock.Lock()
 	defer conn.dataLock.Unlock()
 
-	//TODO: Consider implementing chunking
+	// TODO: Consider implementing chunking
 	if len(p) > 65535 { // uint16 (length bytes) max
 		p = p[:65535]
 	}
@@ -143,7 +144,7 @@ func (conn *tncConn) Flush() error {
 
 func (conn *tncConn) signalClosed() { close(conn.eofChan) }
 
-const flushAndCloseTimeout = 30 * time.Second //TODO: Remove when time is right (see Close).
+const flushAndCloseTimeout = 30 * time.Second // TODO: Remove when time is right (see Close).
 
 // Close closes the current connection.
 //
@@ -152,6 +153,15 @@ func (conn *tncConn) Close() error {
 	if conn == nil {
 		return nil
 	}
+
+	defer func() {
+		for _, fn := range conn.onClose {
+			err := fn()
+			if err != nil && debugEnabled() {
+				log.Printf("onClose func failed: %v", err)
+			}
+		}
+	}()
 
 	// Flush: (THIS WILL PROBABLY BE REMOVED WHEN ARDOP MATURES)
 	// We have to flush, because ardop will disconnect without waiting for the last
