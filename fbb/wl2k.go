@@ -217,6 +217,7 @@ func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 	// The given conn should always be closed after returning from this method.
 	// If an error occurred, echo it to the remote.
 	defer func() {
+		defer conn.Close()
 		switch {
 		case err == nil:
 			// Success :-)
@@ -233,7 +234,6 @@ func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 			// Echo the error to the remote peer and disconnect.
 			conn.SetDeadline(time.Now().Add(time.Minute))
 			fmt.Fprintf(conn, "*** %s\r\n", err)
-			conn.Close()
 		}
 	}()
 
