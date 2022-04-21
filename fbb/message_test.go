@@ -7,6 +7,7 @@ package fbb
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 	"unicode"
@@ -81,6 +82,39 @@ func TestDecodeNonASCIIFileNames(t *testing.T) {
 		if msg.Files()[0].Name() != "æøå.txt" {
 			t.Errorf("Sample %d failed", i)
 		}
+	}
+}
+
+func TestEmptyAttachment(t *testing.T) {
+	msg := NewMessage(Private, "N0CALL")
+	msg.AddFile(NewFile("foo.txt", nil))
+	var buf bytes.Buffer
+	if err := msg.Write(&buf); err != nil {
+		t.Fatalf("Error writing message: %v", err)
+	}
+	if !strings.Contains(buf.String(), "File: 0 foo.txt") {
+		t.Error("Expected File header")
+	}
+	decoded := new(Message)
+	if err := decoded.ReadFrom(&buf); err != nil {
+		t.Fatalf("Error while decoding produced message: %v", err)
+	}
+	if n := len(msg.Files()); n != 1 {
+		t.Fatalf("Expected one attachment after roundtrip, found %d", n)
+	}
+	f := msg.Files()[0]
+	if f.Size() != 0 {
+		t.Errorf("Expected size 0 after roundtrip, found %d", f.Size())
+	}
+	if f.Name() != "foo.txt" {
+		t.Errorf("Got unexpected attachment name after roundtrip: %s", f.Name())
+	}
+	body, err := msg.Body()
+	if err != nil {
+		t.Errorf("Got error reading body: %v", err)
+	}
+	if len(body) != 0 {
+		t.Errorf("Expected no body, got length %d", len(body))
 	}
 }
 
