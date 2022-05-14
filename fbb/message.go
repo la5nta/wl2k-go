@@ -67,6 +67,7 @@ var dateLayouts = []string{
 	DateLayout,         // The correct layout according to Winlink (2006/01/02 15:04).
 	`2006.01.02 15:04`, // Undocumented layout seen when RMS Relay-3.0.27.1 was operating in store-and-forward mode.
 	`2006-01-02 15:04`, // Undocumented layout seen in a Radio Only message forwarded with RMS Relay-3.0.30.0.
+	`20060102150405`,   // Older BPQ format
 }
 
 // From golang.org/src/net/mail/message.go
