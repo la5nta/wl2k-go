@@ -18,6 +18,7 @@ func TestParseDate(t *testing.T) {
 		"2016/12/30 01:00", // The correct format according to winlink.org/b2f.
 		"2016.12.30 01:00", // RMS Relay store-and-forward re-formats date headers in this undocumented layout.
 		"2016-12-30 01:00", // Seen in a Radio Only message via RMS Relay-3.0.30.0.
+		"20161230010000",   // Format known to be produced by some versions of BPQ Mail.
 
 		// Extended format support to ensure we support common email formats.
 		"Fri, 30 Dec 2016 01:00:00 -0000", // RFC 5322, Appendix A.1.1.
