@@ -5,6 +5,7 @@
 package ardop
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -27,6 +28,26 @@ func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 		return nil, err
 	}
 	return tnc.DialBandwidth(url.Target, bw)
+}
+
+// DialURLContext dials ardop:// URLs with cancellation support. See DialURL.
+func (tnc *TNC) DialURLContext(ctx context.Context, url *transport.URL) (net.Conn, error) {
+	var (
+		conn net.Conn
+		err  error
+		done = make(chan struct{})
+	)
+	go func() {
+		conn, err = tnc.DialURL(url)
+		close(done)
+	}()
+	select {
+	case <-done:
+		return conn, err
+	case <-ctx.Done():
+		tnc.Disconnect()
+		return nil, ctx.Err()
+	}
 }
 
 // Dial dials a ARQ connection.

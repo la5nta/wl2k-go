@@ -557,6 +557,9 @@ func (tnc *TNC) Disconnect() error {
 		if msg.cmd == cmdDisconnected {
 			return nil
 		}
+		if tnc.Idle() {
+			return nil
+		}
 	}
 	return ErrTNCClosed
 }
