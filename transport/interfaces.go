@@ -4,7 +4,10 @@
 
 package transport
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 type Flusher interface {
 	// Flush flushes the transmit buffers of the underlying modem.
@@ -34,4 +37,12 @@ type PTTController interface {
 // Dialer is implemented by transports that supports dialing a transport.URL.
 type Dialer interface {
 	DialURL(url *URL) (net.Conn, error)
+}
+
+// ContextDialer is implemented by transports that supports dialing with cancellation.
+type ContextDialer interface {
+	// DiaulURLContext dials a connection.
+	//
+	// If the given context is cancelled before the connection is made, the operation should be aborted and an error returned.
+	DialURLContext(ctx context.Context, url *URL) (net.Conn, error)
 }

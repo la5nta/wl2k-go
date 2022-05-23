@@ -5,6 +5,7 @@
 package transport
 
 import (
+	"context"
 	"errors"
 	"net"
 	"sync"
@@ -17,38 +18,62 @@ var (
 	ErrUnsupportedScheme = errors.New("Unsupported URL scheme")
 )
 
+// noCtxDialer wraps a Dialer to implement the ContextDialer interface.
+type noCtxDialer struct{ Dialer }
+
+func (d noCtxDialer) DialURLContext(_ context.Context, url *URL) (net.Conn, error) {
+	return d.DialURL(url)
+}
+
 // DialURL calls the url.Scheme's Dialer.
 //
 // If the URL's scheme is not registered, ErrMissingDialer is returned.
 func DialURL(url *URL) (net.Conn, error) {
+	return DialURLContext(context.Background(), url)
+}
+
+// DialURLContext calls the url.Scheme's ContextDialer.
+//
+// If the URL's scheme is not registered, ErrMissingDialer is returned.
+func DialURLContext(ctx context.Context, url *URL) (net.Conn, error) {
 	dialers.mu.Lock()
 	dialer, ok := dialers.m[url.Scheme]
 	dialers.mu.Unlock()
-
-	if ok {
-		return dialer.DialURL(url)
+	if !ok {
+		return nil, ErrMissingDialer
 	}
-	return nil, ErrMissingDialer
+	return dialer.DialURLContext(ctx, url)
 }
 
 var dialers struct {
 	mu sync.Mutex
-	m  map[string]Dialer
+	m  map[string]ContextDialer
 }
 
-// RigisterDialer registers a new scheme and it's Dialer.
+// RegisterContextDialer registers a new scheme and it's ContextDialer.
 //
-// The list of registered dialers is used by DialURL.
-func RegisterDialer(scheme string, dialer Dialer) {
+// The list of registered dialers is used by DialURL and DialURLContext.
+func RegisterContextDialer(scheme string, dialer ContextDialer) {
 	dialers.mu.Lock()
 
 	if dialers.m == nil {
-		dialers.m = make(map[string]Dialer)
+		dialers.m = make(map[string]ContextDialer)
 	}
 
 	dialers.m[scheme] = dialer
 
 	dialers.mu.Unlock()
+}
+
+// RigisterDialer registers a new scheme and it's Dialer.
+//
+// The list of registered dialers is used by DialURL and DialURLContext.
+func RegisterDialer(scheme string, dialer Dialer) {
+	d, ok := dialer.(ContextDialer)
+	if !ok {
+		d = noCtxDialer{dialer}
+	}
+	RegisterContextDialer(scheme, d)
 }
 
 // UnregisterDialer removes the given scheme's dialer from the list of dialers.
