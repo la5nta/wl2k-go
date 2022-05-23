@@ -31,6 +31,9 @@ func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 }
 
 // DialURLContext dials ardop:// URLs with cancellation support. See DialURL.
+//
+// If the context is cancelled while dialing, the connection may be closed gracefully before returning an error.
+// Use Abort() for immediate cancellation of a dial operation.
 func (tnc *TNC) DialURLContext(ctx context.Context, url *transport.URL) (net.Conn, error) {
 	var (
 		conn net.Conn

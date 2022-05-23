@@ -43,6 +43,7 @@ type Dialer interface {
 type ContextDialer interface {
 	// DiaulURLContext dials a connection.
 	//
-	// If the given context is cancelled before the connection is made, the operation should be aborted and an error returned.
+	// If the given context is cancelled before the connection is made, the operation is aborted and an error returned.
+	// Once successfully connected, any expiration of the context will not affect the connection.
 	DialURLContext(ctx context.Context, url *URL) (net.Conn, error)
 }
