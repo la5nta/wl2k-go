@@ -7,6 +7,7 @@ package telnet
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -48,10 +49,7 @@ func DialCMS(mycall string) (net.Conn, error) {
 // Dialer implements the transport.Dialer interface.
 type Dialer struct{ Timeout time.Duration }
 
-// DialURL dials telnet:// URLs
-//
-// The URL parameter dial_timeout can be used to set a custom dial timeout interval. E.g. "2m".
-func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
+func (d Dialer) DialURLContext(ctx context.Context, url *transport.URL) (net.Conn, error) {
 	if url.Scheme != "telnet" {
 		return nil, transport.ErrUnsupportedScheme
 	}
@@ -70,7 +68,19 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 		}
 		timeout = dur
 	}
-	return DialTimeout(url.Host, user, pass, timeout)
+	if timeout > 0 {
+		c, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		ctx = c
+	}
+	return DialContext(ctx, url.Host, user, pass)
+}
+
+// DialURL dials telnet:// URLs
+//
+// The URL parameter dial_timeout can be used to set a custom dial timeout interval. E.g. "2m".
+func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
+	return d.DialURLContext(context.Background(), url)
 }
 
 func Dial(addr, mycall, password string) (net.Conn, error) {
@@ -78,7 +88,14 @@ func Dial(addr, mycall, password string) (net.Conn, error) {
 }
 
 func DialTimeout(addr, mycall, password string, timeout time.Duration) (net.Conn, error) {
-	conn, err := net.DialTimeout(`tcp`, addr, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return DialContext(ctx, addr, mycall, password)
+}
+
+func DialContext(ctx context.Context, addr, mycall, password string) (net.Conn, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, `tcp`, addr)
 	if err != nil {
 		return nil, err
 	}
