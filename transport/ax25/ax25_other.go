@@ -2,11 +2,13 @@
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
+//go:build !libax25
 // +build !libax25
 
 package ax25
 
 import (
+	"context"
 	"errors"
 	"net"
 	"time"
@@ -23,5 +25,9 @@ func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (
 }
 
 func DialAX25(axPort, mycall, targetcall string) (*Conn, error) {
-	return DialAX25Timeout(axPort, mycall, targetcall, 0)
+	return nil, ErrNoLibax25
+}
+
+func DialAX25Context(ctx context.Context, axPort, mycall, targetcall string) (*Conn, error) {
+	return nil, ErrNoLibax25
 }

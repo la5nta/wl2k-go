@@ -19,6 +19,7 @@ package ax25
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -119,7 +120,17 @@ type Dialer struct {
 	Timeout time.Duration
 }
 
+// DialURL dials ax25:// and serial-tnc:// URLs.
+//
+// See DialURLContext.
 func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
+	return d.DialURLContext(context.Background(), url)
+}
+
+// DialURLContext dials ax25:// and serial-tnc:// URLs.
+//
+// If the context is cancelled while dialing, the connection may be closed gracefully before returning an error.
+func (d Dialer) DialURLContext(ctx context.Context, url *transport.URL) (net.Conn, error) {
 	target := url.Target
 	if len(url.Digis) > 0 {
 		target = fmt.Sprintf("%s via %s", target, strings.Join(url.Digis, " "))
@@ -127,7 +138,14 @@ func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 
 	switch url.Scheme {
 	case "ax25":
-		return DialAX25Timeout(url.Host, url.User.Username(), target, d.Timeout)
+		ctx, cancel := context.WithTimeout(ctx, d.Timeout)
+		defer cancel()
+		conn, err := DialAX25Context(ctx, url.Host, url.User.Username(), target)
+		if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// Local timeout reached.
+			err = fmt.Errorf("Dial timeout")
+		}
+		return conn, err
 	case "serial-tnc":
 		// TODO: This is some badly designed legacy stuff. Need to re-think the whole
 		// serial-tnc scheme. See issue #34.

@@ -2,6 +2,7 @@
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
+//go:build libax25
 // +build libax25
 
 package ax25
@@ -16,6 +17,7 @@ package ax25
 import "C"
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -139,8 +141,7 @@ func ListenAX25(axPort, mycall string) (net.Listener, error) {
 	}, nil
 }
 
-// DialAX25Timeout acts like DialAX25 but takes a timeout.
-func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (*Conn, error) {
+func DialAX25Context(ctx context.Context, axPort, mycall, targetcall string) (*Conn, error) {
 	if err := checkPort(axPort); err != nil {
 		return nil, err
 	}
@@ -166,7 +167,7 @@ func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (
 	}
 
 	// Connect
-	err := socket.connectTimeout(remoteAddr, timeout)
+	err := socket.connectContext(ctx, remoteAddr)
 	if err != nil {
 		socket.close()
 		return nil, err
@@ -177,6 +178,18 @@ func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (
 		localAddr:       AX25Addr{localAddr},
 		remoteAddr:      AX25Addr{remoteAddr},
 	}, nil
+}
+
+// DialAX25Timeout acts like DialAX25 but takes a timeout.
+func DialAX25Timeout(axPort, mycall, targetcall string, timeout time.Duration) (*Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn, err := DialAX25Context(ctx, axPort, mycall, targetcall)
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		// Local timeout reached.
+		err = fmt.Errorf("Dial timeout")
+	}
+	return conn, err
 }
 
 func (c *Conn) Close() error {
@@ -217,7 +230,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 		return
 	}
 
-	//TODO: These errors should not be checked using string comparison!
+	// TODO: These errors should not be checked using string comparison!
 	// The weird error handling here is needed because of how the *os.File treats
 	// the underlying fd. This should be fixed the same way as net.FileConn does.
 	switch perr.Err.Error() {
@@ -232,16 +245,14 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 //
 // An error will be returned if axPort is empty.
 func DialAX25(axPort, mycall, targetcall string) (*Conn, error) {
-	return DialAX25Timeout(axPort, mycall, targetcall, 0)
+	return DialAX25Context(context.Background(), axPort, mycall, targetcall)
 }
 
-func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) {
-	if timeout == 0 {
-		return sock.connect(addr)
-	}
+func (sock fd) connectContext(ctx context.Context, addr ax25Addr) (err error) {
 	if err = syscall.SetNonblock(int(sock), true); err != nil {
 		return err
 	}
+	defer syscall.SetNonblock(int(sock), false)
 
 	err = sock.connect(addr)
 	if err == nil {
@@ -250,19 +261,21 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 		return err
 	}
 
-	fdset := new(syscall.FdSet)
-	maxFd := fdSet(fdset, int(sock))
-
-	// Wait or timeout
-	var n int
-	var tv syscall.Timeval
+	// Wait for response as long as the dial context is valid.
 	for {
-		tv = syscall.NsecToTimeval(int64(timeout))
-		n, err = syscall.Select(maxFd+1, nil, fdset, nil, &tv)
-		if n < 0 && err != syscall.EINTR {
+		if ctx.Err() != nil {
+			sock.close()
+			return ctx.Err()
+		}
+		fdset := new(syscall.FdSet)
+		maxFd := fdSet(fdset, int(sock))
+		tv := syscall.NsecToTimeval(int64(10 * time.Millisecond))
+		n, err := syscall.Select(maxFd+1, nil, fdset, nil, &tv)
+		switch {
+		case n < 0 && err != syscall.EINTR:
 			sock.close()
 			return err
-		} else if n > 0 {
+		case n > 0:
 			// Verify that connection is OK
 			nerr, err := syscall.GetsockoptInt(int(sock), syscall.SOL_SOCKET, syscall.SO_ERROR)
 			if err != nil {
@@ -273,17 +286,13 @@ func (sock fd) connectTimeout(addr ax25Addr, timeout time.Duration) (err error) 
 			if nerr != 0 && err != syscall.EINPROGRESS && err != syscall.EALREADY && err != syscall.EINTR {
 				sock.close()
 				return err
-			} else {
-				break // Connected
 			}
-		} else {
-			sock.close()
-			return fmt.Errorf("Dial timeout")
+			return nil // Connected
+		default:
+			// Nothing has changed yet. Keep looping.
+			continue
 		}
 	}
-
-	syscall.SetNonblock(int(sock), false)
-	return
 }
 
 // waitRead blocks until the socket is ready for read or the call is canceled
@@ -387,7 +396,7 @@ func (a *ax25Addr) numDigis() int {
 
 func (a *ax25Addr) digis() []ax25_address {
 	digis := make([]ax25_address, a.numDigis())
-	for i, _ := range digis {
+	for i := range digis {
 		digis[i] = (*C.ax25_address)(unsafe.Pointer(&a.fsa_digipeater[i]))
 	}
 	return digis
