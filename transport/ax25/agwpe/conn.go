@@ -49,21 +49,58 @@ func (c *Conn) numOutstandingFrames() (int, error) {
 // Flush implements the transport.Flusher interface.
 func (c *Conn) Flush() error {
 	debugf("flushing...")
-	for {
-		n, err := c.p.numOutstandingFrames()
-		if err != nil {
-			return err
+	defer debugf("flushed")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	return c.waitOutstandingFrames(ctx, 0)
+}
+
+// waitOutstandingFrames blocks until the number of outstanding frames is less than the given limit.
+func (c *Conn) waitOutstandingFrames(ctx context.Context, limit int) error {
+	debugf("wait outstanding frames (limit=%d)...", limit)
+	errs := make(chan error, 1)
+	go func() {
+		defer close(errs)
+		tick := time.NewTicker(100 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			n, err := c.numOutstandingFrames()
+			if err != nil {
+				errs <- err
+				return
+			}
+			if n <= limit {
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				continue
+			}
 		}
-		if n == 0 {
-			debugf("flushed")
-			return nil
-		}
-		time.Sleep(200 * time.Millisecond)
+	}()
+	select {
+	case <-ctx.Done():
+		debugf("outstanding frames wait ended: %v", ctx.Err())
+		return ctx.Err()
+	case err := <-errs:
+		debugf("outstanding frames wait ended: %v", err)
+		return err
 	}
 }
 
 func (c *Conn) Write(p []byte) (int, error) {
-	// TODO: c.writeDeadline
+	ctx := context.Background()
+	if !c.writeDeadline.IsZero() {
+		var cancel func()
+		ctx, cancel = context.WithDeadline(ctx, c.writeDeadline)
+		defer cancel()
+	}
+	// Block until we have no more than one outstanding frame so we don't keep filling the TX buffer.
+	if err := c.waitOutstandingFrames(ctx, 1); err != nil {
+		return 0, err
+	}
 	cp := make([]byte, len(p))
 	copy(cp, p)
 	f := connectedDataFrame(c.p.port, c.srcCall, c.dstCall, p)
