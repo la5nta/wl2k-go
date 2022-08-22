@@ -42,6 +42,9 @@ func newConn(p *Port, dstCall string, via ...string) *Conn {
 }
 
 func (c *Conn) numOutstandingFrames() (int, error) {
+	if c.demux.isClosed() {
+		return 0, io.EOF
+	}
 	// TODO: From Direwolf 1.5 we could get connection specific value using the 'Y' frame.
 	return c.p.numOutstandingFrames()
 }
@@ -52,12 +55,12 @@ func (c *Conn) Flush() error {
 	defer debugf("flushed")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	return c.waitOutstandingFrames(ctx, 0)
+	return c.waitOutstandingFrames(ctx, func(n int) bool { return n == 0 })
 }
 
 // waitOutstandingFrames blocks until the number of outstanding frames is less than the given limit.
-func (c *Conn) waitOutstandingFrames(ctx context.Context, limit int) error {
-	debugf("wait outstanding frames (limit=%d)...", limit)
+func (c *Conn) waitOutstandingFrames(ctx context.Context, stop func(int) bool) error {
+	debugf("wait outstanding frames...")
 	errs := make(chan error, 1)
 	go func() {
 		defer close(errs)
@@ -69,7 +72,7 @@ func (c *Conn) waitOutstandingFrames(ctx context.Context, limit int) error {
 				errs <- err
 				return
 			}
-			if n <= limit {
+			if stop(n) {
 				return
 			}
 			select {
@@ -98,13 +101,17 @@ func (c *Conn) Write(p []byte) (int, error) {
 		defer cancel()
 	}
 	// Block until we have no more than one outstanding frame so we don't keep filling the TX buffer.
-	if err := c.waitOutstandingFrames(ctx, 1); err != nil {
+	if err := c.waitOutstandingFrames(ctx, func(n int) bool { return n <= 1 }); err != nil {
 		return 0, err
 	}
 	cp := make([]byte, len(p))
 	copy(cp, p)
 	f := connectedDataFrame(c.p.port, c.srcCall, c.dstCall, p)
 	if err := c.p.write(f); err != nil {
+		return 0, err
+	}
+	// Block until we see at least one outstanding frame to avoid race condition if Flush() is called immediately after this.
+	if err := c.waitOutstandingFrames(ctx, func(n int) bool { return n > 0 }); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -137,10 +144,23 @@ func (c *Conn) Close() error {
 	if c.demux.isClosed() {
 		return nil
 	}
-	c.Flush()
 	defer c.demux.Close()
-	return c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port))
-	// TODO: Block until disconnect ack
+	if err := c.Flush(); err == io.EOF {
+		debugf("connection closed by remote peer while flushing")
+		return nil
+	}
+	ack := c.demux.NextFrame(kindDisconnect)
+	if err := c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port)); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute) //TODO
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-ack:
+		return nil
+	}
 }
 
 func (c *Conn) connect(ctx context.Context) error {

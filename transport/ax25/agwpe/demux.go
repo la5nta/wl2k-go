@@ -123,7 +123,9 @@ func (d *demux) NextFrame(kinds ...kind) <-chan frame {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.closed {
-		return nil
+		c := make(chan frame)
+		close(c)
+		return c
 	}
 	req := newFramesReq(1, framesFilter{kinds: kinds})
 	req.once = true
