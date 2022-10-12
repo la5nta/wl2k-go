@@ -21,6 +21,8 @@ type Conn struct {
 	via              []string
 
 	readDeadline, writeDeadline time.Time
+
+	closing bool // Guard against Write calls once Close() is called.
 }
 
 func newConn(p *Port, dstCall string, via ...string) *Conn {
@@ -66,7 +68,7 @@ func (c *Conn) numOutstandingFrames() (int, error) {
 	select {
 	case f, ok := <-resp:
 		if !ok {
-			return 0, nil
+			return 0, io.EOF
 		}
 		if len(f.Data) != 4 {
 			return 0, fmt.Errorf("'%c' frame with unexpected data length", f.DataKind)
@@ -124,6 +126,10 @@ func (c *Conn) waitOutstandingFrames(ctx context.Context, stop func(int) bool) e
 }
 
 func (c *Conn) Write(p []byte) (int, error) {
+	if c.closing {
+		return 0, io.EOF
+	}
+
 	ctx := context.Background()
 	if !c.writeDeadline.IsZero() {
 		var cancel func()
@@ -172,12 +178,13 @@ func (c *Conn) Read(p []byte) (int, error) {
 }
 
 func (c *Conn) Close() error {
-	if c.demux.isClosed() {
+	if c.closing || c.demux.isClosed() {
 		return nil
 	}
+	c.closing = true
 	defer c.demux.Close()
 	if err := c.Flush(); err == io.EOF {
-		debugf("connection closed by remote peer while flushing")
+		debugf("link closed while flushing")
 		return nil
 	}
 	ack := c.demux.NextFrame(kindDisconnect)
