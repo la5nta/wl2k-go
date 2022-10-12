@@ -94,7 +94,7 @@ func (t *TNC) RegisterPort(port int, mycall string) (*Port, error) {
 
 func (t *TNC) write(f frame) error {
 	_, err := f.WriteTo(t.conn)
-	if err == nil {
+	if err == nil && f.DataKind != kindOutstandingFramesForConn {
 		debugf("-> %v", f)
 	}
 	return err
@@ -102,7 +102,7 @@ func (t *TNC) write(f frame) error {
 
 func (t *TNC) read(f *frame) error {
 	_, err := f.ReadFrom(t.conn)
-	if err == nil {
+	if err == nil && f.DataKind != kindOutstandingFramesForConn {
 		debugf("<- %v", *f)
 	}
 	return err

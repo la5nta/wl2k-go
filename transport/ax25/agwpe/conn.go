@@ -3,6 +3,7 @@ package agwpe
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ import (
 type Conn struct {
 	p          *Port
 	demux      *demux
+	inbound    bool
 	dataFrames <-chan frame
 
 	srcCall, dstCall string
@@ -41,12 +43,39 @@ func newConn(p *Port, dstCall string, via ...string) *Conn {
 	}
 }
 
+// TODO: How can we tell?
+func notDirewolf() bool { return false }
+
+// This requires Direwolf >= 1.4, but reliability improved as late as 1.6. It's required in order to flush tx buffers before link teardown.
 func (c *Conn) numOutstandingFrames() (int, error) {
 	if c.demux.isClosed() {
 		return 0, io.EOF
 	}
-	// TODO: From Direwolf 1.5 we could get connection specific value using the 'Y' frame.
-	return c.p.numOutstandingFrames()
+	resp := c.demux.NextFrame(kindOutstandingFramesForConn)
+
+	// According to the docs, the CallFrom and CallTo "should reflect the order used to start the connection".
+	// However, Direwolf does not seem to implement this... so we need to...
+	from, to := c.srcCall, c.dstCall
+	if c.inbound && notDirewolf() {
+		from, to = to, from
+	}
+	f := outstandingFramesForConnFrame(c.p.port, from, to)
+	if err := c.p.write(f); err != nil {
+		return 0, err
+	}
+	select {
+	case f, ok := <-resp:
+		if !ok {
+			return 0, nil
+		}
+		if len(f.Data) != 4 {
+			return 0, fmt.Errorf("'%c' frame with unexpected data length", f.DataKind)
+		}
+		return int(binary.LittleEndian.Uint32(f.Data)), nil
+	case <-time.After(30 * time.Second):
+		debugf("'%c' answer timeout. frame kind probably unsupported by TNC.", f.DataKind)
+		return 0, fmt.Errorf("'%c' frame timeout", f.DataKind)
+	}
 }
 
 // Flush implements the transport.Flusher interface.
@@ -60,11 +89,10 @@ func (c *Conn) Flush() error {
 
 // waitOutstandingFrames blocks until the number of outstanding frames is less than the given limit.
 func (c *Conn) waitOutstandingFrames(ctx context.Context, stop func(int) bool) error {
-	debugf("wait outstanding frames...")
 	errs := make(chan error, 1)
 	go func() {
 		defer close(errs)
-		tick := time.NewTicker(100 * time.Millisecond)
+		tick := time.NewTicker(200 * time.Millisecond)
 		defer tick.Stop()
 		for {
 			n, err := c.numOutstandingFrames()
@@ -88,7 +116,9 @@ func (c *Conn) waitOutstandingFrames(ctx context.Context, stop func(int) bool) e
 		debugf("outstanding frames wait ended: %v", ctx.Err())
 		return ctx.Err()
 	case err := <-errs:
-		debugf("outstanding frames wait ended: %v", err)
+		if err != nil {
+			debugf("outstanding frames wait error: %v", err)
+		}
 		return err
 	}
 }
@@ -100,8 +130,9 @@ func (c *Conn) Write(p []byte) (int, error) {
 		ctx, cancel = context.WithDeadline(ctx, c.writeDeadline)
 		defer cancel()
 	}
-	// Block until we have no more than one outstanding frame so we don't keep filling the TX buffer.
-	if err := c.waitOutstandingFrames(ctx, func(n int) bool { return n <= 1 }); err != nil {
+	// Block until we have no more than MAXFRAME outstanding frames, so we don't keep filling the TX buffer.
+	// bug(martinhpedersen): MAXFRAME is not always correct. EMAXFRAME could apply for this connection, but there is no way of knowing.
+	if err := c.waitOutstandingFrames(ctx, func(n int) bool { return n <= c.p.maxFrame }); err != nil {
 		return 0, err
 	}
 	cp := make([]byte, len(p))
@@ -153,7 +184,7 @@ func (c *Conn) Close() error {
 	if err := c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port)); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute) //TODO
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute) // TODO
 	defer cancel()
 	select {
 	case <-ctx.Done():

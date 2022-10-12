@@ -16,6 +16,7 @@ type Port struct {
 	tnc          *TNC
 	port         uint8
 	mycall       string
+	maxFrame     int
 	demux        *demux
 	inboundConns <-chan *Conn
 }
@@ -47,6 +48,7 @@ func (p *Port) handleInbound() <-chan *Conn {
 				continue
 			}
 			conn := newConn(p, f.From.String())
+			conn.inbound = true
 			select {
 			case conns <- conn:
 				debugf("inbound connection from %s accepted", f.From)
@@ -61,6 +63,14 @@ func (p *Port) handleInbound() <-chan *Conn {
 }
 
 func (p *Port) register(ctx context.Context) error {
+	capabilities, err := p.getCapabilities(ctx)
+	if err != nil {
+		debugf("failed to get port capabilities: %v", err)
+		p.maxFrame = 7 // Set a reasonable default.
+	} else {
+		p.maxFrame = int(capabilities.MaxFrame)
+	}
+
 	ack := p.demux.NextFrame(kindRegister)
 	if err := p.write(registerCallsignFrame(p.mycall, p.port)); err != nil {
 		return err
@@ -75,8 +85,37 @@ func (p *Port) register(ctx context.Context) error {
 		if f.Data[0] != 0x01 {
 			return fmt.Errorf("callsign in use")
 		}
-		debugf("Port %d registered as %s", p.port, p.mycall)
+		debugf("Port %d registered as %s. MAXFRAME=%d", p.port, p.mycall, p.maxFrame)
 		return nil
+	}
+}
+
+type portCapabilities struct {
+	_        byte  // On air baud rate (0=1200/1=2400/2=4800/3=9600…)
+	_        byte  // Traffic level (if 0xFF the port is not in autoupdate mode)
+	_        byte  // TX Delay
+	_        byte  // TX Tail
+	_        byte  // Persist
+	_        byte  // SlotTime
+	MaxFrame uint8 // MaxFrame
+	_        byte  // How Many connections are active on this port
+	_        int32 // HowManyBytes (received in the last 2 minutes)
+}
+
+func (p *Port) getCapabilities(ctx context.Context) (*portCapabilities, error) {
+	resp := p.demux.NextFrame(kindPortCapabilities)
+	if err := p.write(portCapabilitiesFrame(p.port)); err != nil {
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case f := <-resp:
+		var v portCapabilities
+		if err := binary.Read(bytes.NewReader(f.Data), binary.LittleEndian, &v); err != nil {
+			return nil, err
+		}
+		return &v, nil
 	}
 }
 
