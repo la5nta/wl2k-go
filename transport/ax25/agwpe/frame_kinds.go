@@ -7,21 +7,31 @@ import (
 type kind byte
 
 const (
-	kindLogin         kind = 'P'
-	kindRegister      kind = 'X'
-	kindUnregister    kind = 'x'
-	kindVersionNumber kind = 'R'
+	kindLogin                    kind = 'P'
+	kindRegister                 kind = 'X'
+	kindUnregister               kind = 'x'
+	kindVersionNumber            kind = 'R'
+	kindOutstandingFramesForPort kind = 'y' // Direwolf >= 1.2
+	kindPortCapabilities         kind = 'g'
 
 	kindConnect                  kind = 'C'
 	kindConnectVia               kind = 'v'
 	kindDisconnect               kind = 'd'
 	kindConnectedData            kind = 'D'
-	kindOutstandingFramesForPort kind = 'y' // Direwolf >= 1.2
 	kindOutstandingFramesForConn kind = 'Y' // Direwolf >= 1.4
 )
 
 func versionNumberFrame() frame {
 	return frame{header: header{DataKind: kindVersionNumber}}
+}
+
+func portCapabilitiesFrame(port uint8) frame {
+	return frame{
+		header: header{
+			Port:     port,
+			DataKind: kindPortCapabilities,
+		},
+	}
 }
 
 func connectedDataFrame(port uint8, from, to string, data []byte) frame {
