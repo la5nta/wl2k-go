@@ -19,6 +19,7 @@ const (
 	kindDisconnect               kind = 'd'
 	kindConnectedData            kind = 'D'
 	kindOutstandingFramesForConn kind = 'Y' // Direwolf >= 1.4
+	kindUnprotoInformation       kind = 'M'
 )
 
 func versionNumberFrame() frame {
@@ -110,6 +111,15 @@ func connectViaFrame(from, to string, port uint8, digis []string) frame {
 		buf.Write([]byte(callsign[:]))
 	}
 	return frame{header: h, Data: buf.Bytes()}
+}
+
+func unprotoInformationFrame(from, to string, port uint8, data []byte) frame {
+	h := header{
+		DataKind: kindUnprotoInformation,
+		From:     callsignFromString(from),
+		To:       callsignFromString(to),
+	}
+	return frame{header: h, Data: data}
 }
 
 func disconnectFrame(from, to string, port uint8) frame {
