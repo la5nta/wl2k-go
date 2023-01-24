@@ -157,6 +157,14 @@ func (p *Port) Listen() (net.Listener, error) {
 	return newListener(p), nil
 }
 
+func (p *Port) SendUI(data []byte, dst string) error {
+	if p.demux.isClosed() {
+		return ErrPortClosed
+	}
+	f := unprotoInformationFrame(p.mycall, dst, p.port, data)
+	return p.tnc.write(f)
+}
+
 func (p *Port) numOutstandingFrames() (int, error) {
 	resp := p.demux.NextFrame(kindOutstandingFramesForPort)
 	f := outstandingFramesForPortFrame(p.port)
