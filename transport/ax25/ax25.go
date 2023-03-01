@@ -4,17 +4,16 @@
 
 // Package ax25 provides a net.Conn and net.Listener interfaces for AX.25.
 //
-// Supported TNCs
+// # Supported TNCs
 //
 // This package currently implements interfaces for Linux' AX.25 stack and Tasco-like TNCs (Kenwood transceivers).
 //
-// Build tags
+// # Build tags
 //
 // The Linux AX.25 stack bindings are guarded by some custom build tags:
 //
-//    libax25 // Include support for Linux' AX.25 stack by linking against libax25.
-//    static  // Link against static libraries only.
-//
+//	libax25 // Include support for Linux' AX.25 stack by linking against libax25.
+//	static  // Link against static libraries only.
 package ax25
 
 import (

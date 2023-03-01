@@ -2,7 +2,8 @@
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
-// +build libax25
+//go:build libax25 && cgo
+// +build libax25,cgo
 
 package ax25
 
@@ -52,7 +53,7 @@ func (b *ax25Beacon) Every(d time.Duration) error {
 
 func (b *ax25Beacon) Now() error {
 	// Create file descriptor
-	//REVIEW: Should we keep it for next beacon?
+	// REVIEW: Should we keep it for next beacon?
 	var socket fd
 	if f, err := syscall.Socket(syscall.AF_AX25, syscall.SOCK_DGRAM, 0); err != nil {
 		return err
