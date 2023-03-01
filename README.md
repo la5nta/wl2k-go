@@ -1,6 +1,5 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/la5nta/wl2k-go)](https://pkg.go.dev/github.com/la5nta/wl2k-go)
 [![Build status](https://github.com/la5nta/wl2k-go/actions/workflows/go.yaml/badge.svg)](https://github.com/la5nta/wl2k-go/actions)
-[![Windows Build Status](https://ci.appveyor.com/api/projects/status/j76on3km4vy5vsq0/branch/master?svg=true)](https://ci.appveyor.com/project/martinhpedersen/wl2k-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/la5nta/wl2k-go)](https://goreportcard.com/report/github.com/la5nta/wl2k-go)
 
 ### Looking for the cross platform winlink client? Visit [http://getpat.io](http://getpat.io).
