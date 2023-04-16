@@ -2,8 +2,8 @@
 // Use of this source code is governed by the MIT-license that can be
 // found in the LICENSE file.
 
-//go:build libax25
-// +build libax25
+//go:build libax25 && cgo
+// +build libax25,cgo
 
 package ax25
 

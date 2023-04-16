@@ -4,17 +4,16 @@
 
 // Package ax25 provides a net.Conn and net.Listener interfaces for AX.25.
 //
-// Supported TNCs
+// # Supported TNCs
 //
 // This package currently implements interfaces for Linux' AX.25 stack and Tasco-like TNCs (Kenwood transceivers).
 //
-// Build tags
+// # Build tags
 //
 // The Linux AX.25 stack bindings are guarded by some custom build tags:
 //
-//    libax25 // Include support for Linux' AX.25 stack by linking against libax25.
-//    static  // Link against static libraries only.
-//
+//	libax25 // Include support for Linux' AX.25 stack by linking against libax25.
+//	static  // Link against static libraries only.
 package ax25
 
 import (
@@ -43,6 +42,8 @@ var DefaultDialer = &Dialer{Timeout: 45 * time.Second}
 func init() {
 	transport.RegisterDialer("ax25", DefaultDialer)
 	transport.RegisterDialer("serial-tnc", DefaultDialer)
+	transport.RegisterDialer("ax25+linux", DefaultDialer)
+	transport.RegisterDialer("ax25+serial-tnc", DefaultDialer)
 }
 
 type addr interface {
@@ -120,14 +121,14 @@ type Dialer struct {
 	Timeout time.Duration
 }
 
-// DialURL dials ax25:// and serial-tnc:// URLs.
+// DialURL dials ax25://, ax25+linux://, serial-tnc:// and ax25+serial-tnc:// URLs.
 //
 // See DialURLContext.
 func (d Dialer) DialURL(url *transport.URL) (net.Conn, error) {
 	return d.DialURLContext(context.Background(), url)
 }
 
-// DialURLContext dials ax25:// and serial-tnc:// URLs.
+// DialURLContext dials ax25://, ax25+linux://, serial-tnc:// and ax25+serial-tnc:// URLs.
 //
 // If the context is cancelled while dialing, the connection may be closed gracefully before returning an error.
 func (d Dialer) DialURLContext(ctx context.Context, url *transport.URL) (net.Conn, error) {
@@ -137,7 +138,7 @@ func (d Dialer) DialURLContext(ctx context.Context, url *transport.URL) (net.Con
 	}
 
 	switch url.Scheme {
-	case "ax25":
+	case "ax25", "ax25+linux":
 		ctx, cancel := context.WithTimeout(ctx, d.Timeout)
 		defer cancel()
 		conn, err := DialAX25Context(ctx, url.Host, url.User.Username(), target)
@@ -146,7 +147,7 @@ func (d Dialer) DialURLContext(ctx context.Context, url *transport.URL) (net.Con
 			err = fmt.Errorf("Dial timeout")
 		}
 		return conn, err
-	case "serial-tnc":
+	case "serial-tnc", "ax25+serial-tnc":
 		// TODO: This is some badly designed legacy stuff. Need to re-think the whole
 		// serial-tnc scheme. See issue #34.
 		hbaud := HBaud(1200)
