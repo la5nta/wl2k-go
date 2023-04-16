@@ -367,7 +367,7 @@ func (tnc *TNC) close() {
 	runtime.SetFinalizer(tnc, nil)
 }
 
-// Returns true if channel is clear
+// Returns true if channel is not clear
 func (tnc *TNC) Busy() bool {
 	return tnc.busy
 }
