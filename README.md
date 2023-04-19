@@ -81,17 +81,8 @@ For detailed package documentation, see <http://godoc.org/github.com/la5nta/wl2k
 * Wrapper for the Linux AX.25 library (build with tag "libax25").
 * Kenwood TH-D7x/TM-D7x0 (or similar) TNCs over serial.
 
-#### winmor
-A WINMOR TNC driver that provides dialing and listen capabilities for a local or remote TNC.
-
-The WINMOR TNC can be run under Wine:
-* Tested OK with WINMOR TNC 1.5.7.0 running on wine 1.6.2-17 (debian jessie) with .NET 2.0, 3.0 and 3.5 installed.
-* Tested OK with WINMOR TNC 1.4.7.0 running on wine 1.4.1-4 (debian wheezy) with .NET 2.0, 3.0, 3.5 and 4.0 installed.
-
-When running WINMOR TNC under wine through pulseaudio, set PULSE_LATENCY_MSEC=60.
-
 #### ardop
-A driver for the ARDOP_Win (alpha) TNC that provides dialing and listen capabilities over ARDOP (Amateur Radio Digital Open Protocol).
+A driver for the ARDOP_WIN and ARDOPc TNCs. Provides dialing and listen capabilities over ARDOP (Amateur Radio Digital Open Protocol).
 
 ## mailbox: Directory based MBoxHandler implementation
 

@@ -36,7 +36,7 @@ type URL struct {
 //
 // scheme://(mycall(:password)@)(host)(/digi1/...)/targetcall
 // Examples:
-//   - winmor:///LA1B                       (Addresses LA1B on WINMOR).
+//   - ardop:///LA1B                        (Addresses LA1B on ARDOP).
 //   - ax25://mycall@myaxport/LD5SK/LA1B-10 (Addresses LA1B-10 via LD5SK using AX.25-port "myaxport" and "MYCALL" as source callsign).
 //
 // The special query parameter host will override the host part of the path. (E.g. ax25:///LA1B?host=ax0 == ax25://ax0/LA1B).
@@ -73,7 +73,8 @@ func ParseURL(rawurl string) (*URL, error) {
 		url.Digis = []string{}
 	}
 
-	digisUnsupported := url.Scheme == "winmor" || url.Scheme == "ardop" || url.Scheme == "ardop2" || url.Scheme == "telnet"
+	// TODO: This should be up to the specific transport to decide.
+	digisUnsupported := url.Scheme == "ardop" || url.Scheme == "telnet"
 	if len(url.Digis) > 0 && digisUnsupported {
 		return url, ErrDigisUnsupported
 	}
