@@ -56,7 +56,7 @@ func (c *Conn) numOutstandingFrames() (int, error) {
 	resp := c.demux.NextFrame(kindOutstandingFramesForConn)
 
 	// According to the docs, the CallFrom and CallTo "should reflect the order used to start the connection".
-	// However, Direwolf does not seem to implement this... so we need to...
+	// However, neither Direwolf nor QtSoundModem seems to implement this...
 	from, to := c.srcCall, c.dstCall
 	if c.inbound && notDirewolf() {
 		from, to = to, from

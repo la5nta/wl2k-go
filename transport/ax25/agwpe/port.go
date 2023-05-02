@@ -71,7 +71,8 @@ func (p *Port) register(ctx context.Context) error {
 		p.maxFrame = int(capabilities.MaxFrame)
 	}
 
-	ack := p.demux.NextFrame(kindRegister)
+	// QtSoundModem responds with a 'x' frame instead of the expected 'X' frame.
+	ack := p.demux.NextFrame(kindRegister, 'x')
 	if err := p.write(registerCallsignFrame(p.mycall, p.port)); err != nil {
 		return err
 	}
