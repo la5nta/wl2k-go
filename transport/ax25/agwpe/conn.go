@@ -30,7 +30,11 @@ func newConn(p *Port, dstCall string, via ...string) *Conn {
 	disconnect := demux.NextFrame(kindDisconnect)
 	dataFrames, cancelData := demux.Frames(10, framesFilter{kinds: []kind{kindConnectedData}})
 	go func() {
-		<-disconnect
+		_, ok := <-disconnect
+		if !ok {
+			debugf("demux closed while waiting for disconnect frame")
+			return
+		}
 		debugf("disconnect frame received - connection teardown...")
 		cancelData()
 		demux.Close()
