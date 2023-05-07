@@ -91,11 +91,15 @@ func unregisterCallsignFrame(callsign string, port uint8) frame {
 	return frame{header: h}
 }
 
-func connectFrame(from, to string, port uint8) frame {
-	h := header{DataKind: kindConnect}
-	copy(h.From[:], from)
-	copy(h.To[:], to)
-	return frame{header: h}
+func connectFrame(from, to string, port uint8, digis []string) frame {
+	if len(digis) > 0 {
+		return connectViaFrame(from, to, port, digis)
+	}
+	return frame{header: header{
+		DataKind: kindConnect,
+		From:     callsignFromString(from),
+		To:       callsignFromString(to),
+	}}
 }
 
 func connectViaFrame(from, to string, port uint8, digis []string) frame {
