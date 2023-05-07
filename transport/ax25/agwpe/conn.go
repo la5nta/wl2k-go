@@ -213,30 +213,45 @@ func (c *Conn) connect(ctx context.Context) error {
 		return connectFrame(c.srcCall, c.dstCall, c.p.port)
 	}
 
+	// We handle context cancellation by sending a disconect to the TNC. This will
+	// cause the TNC to send a disconnect frame back to us if the TNC supports it, or
+	// keep dialing until connect or timeout. The latter is the case with Direwolf as
+	// of 2021-05-07. This will be fixed in a future release of Direwolf.
+	done := make(chan struct{}, 1)
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			debugf("context cancellation - sending disconnect frame...")
+			c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port))
+		case <-done:
+			debugf("dial completed - context cancellation no longer possible")
+		}
+	}()
+
 	ack := c.demux.NextFrame(kindConnect, kindDisconnect)
 	if err := c.p.write(connectFrame()); err != nil {
 		return err
 	}
-	select {
-	case <-ctx.Done():
-		c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port))
-		return ctx.Err()
-	case f, ok := <-ack:
-		if !ok {
-			return ErrPortClosed
+	f, ok := <-ack
+	if !ok {
+		return ErrPortClosed
+	}
+	done <- struct{}{} // Dial cancellation is no longer possible.
+	switch f.DataKind {
+	case kindConnect:
+		if !bytes.HasPrefix(f.Data, []byte("*** CONNECTED With ")) {
+			c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port))
+			return fmt.Errorf("connect precondition failed")
 		}
-		switch f.DataKind {
-		case kindConnect:
-			if !bytes.HasPrefix(f.Data, []byte("*** CONNECTED With ")) {
-				c.p.write(disconnectFrame(c.srcCall, c.dstCall, c.p.port))
-				return fmt.Errorf("connect precondition failed")
-			}
-			return nil
-		case kindDisconnect:
-			return fmt.Errorf("%s", strings.TrimSpace(strFromBytes(f.Data)))
-		default:
-			panic("impossible")
+		return nil
+	case kindDisconnect:
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+		return fmt.Errorf("%s", strings.TrimSpace(strFromBytes(f.Data)))
+	default:
+		panic("impossible")
 	}
 }
 
