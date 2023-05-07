@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -49,8 +51,7 @@ func newConn(p *Port, dstCall string, via ...string) *Conn {
 	}
 }
 
-// TODO: How can we tell?
-func notDirewolf() bool { return false }
+func reverseToFrom() bool { t, _ := strconv.ParseBool(os.Getenv("AGWPE_REVERSE_TO_FROM")); return t }
 
 // This requires Direwolf >= 1.4, but reliability improved as late as 1.6. It's required in order to flush tx buffers before link teardown.
 func (c *Conn) numOutstandingFrames() (int, error) {
@@ -59,12 +60,14 @@ func (c *Conn) numOutstandingFrames() (int, error) {
 	}
 	resp := c.demux.NextFrame(kindOutstandingFramesForConn)
 
+	from, to := c.srcCall, c.dstCall
+
 	// According to the docs, the CallFrom and CallTo "should reflect the order used to start the connection".
 	// However, neither Direwolf nor QtSoundModem seems to implement this...
-	from, to := c.srcCall, c.dstCall
-	if c.inbound && notDirewolf() {
+	if c.inbound && reverseToFrom() {
 		from, to = to, from
 	}
+
 	f := outstandingFramesForConnFrame(c.p.port, from, to)
 	if err := c.p.write(f); err != nil {
 		return 0, err
