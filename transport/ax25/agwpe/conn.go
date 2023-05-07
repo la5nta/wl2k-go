@@ -206,13 +206,6 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) connect(ctx context.Context) error {
-	connectFrame := func() frame {
-		if len(c.via) > 0 {
-			return connectViaFrame(c.srcCall, c.dstCall, c.p.port, c.via)
-		}
-		return connectFrame(c.srcCall, c.dstCall, c.p.port)
-	}
-
 	// We handle context cancellation by sending a disconect to the TNC. This will
 	// cause the TNC to send a disconnect frame back to us if the TNC supports it, or
 	// keep dialing until connect or timeout. The latter is the case with Direwolf as
@@ -230,7 +223,7 @@ func (c *Conn) connect(ctx context.Context) error {
 	}()
 
 	ack := c.demux.NextFrame(kindConnect, kindDisconnect)
-	if err := c.p.write(connectFrame()); err != nil {
+	if err := c.p.write(connectFrame(c.srcCall, c.dstCall, c.p.port, c.via)); err != nil {
 		return err
 	}
 	f, ok := <-ack
