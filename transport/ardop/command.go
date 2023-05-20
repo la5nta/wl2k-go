@@ -86,6 +86,7 @@ const (
 	cmdFECmode       command = "FECMODE"    // FECMODE<8FSK.200.25|4FSK.200.50S|4FSK.200.50,4PSK.200.100S|4PSK.200.100|8PSK.200.100|16FSK.500.25S|16FSK.500.25|4FSK.500.100S|4FSK.500.100| 4PSK.500.100|8PSK.500.100|4PSK.500.167|8PSK.500.167|4FSK.1000.100|4PSK.1000.100|8PSK.1000.100|4PSK.1000.167|8PSK.1000.167|4FSK.2000.600S|4FSK.2000.600|4FSK.2000.100|4PSK.2000.100|8PSK.2000.100|4PSK.2000.167|8PSK.2000.167
 	cmdFECrepeats    command = "FECREPEATS" // <0-5> Sets the number of times a frame is repeated in FEC (multicast) mode. Higher number of repeats increases good copy probability under marginal conditions but reduces net throughput.
 	cmdFECsend       command = "FECSEND"    // Start/Stop FEC broadcast/multicast mode for specific FECMODE. FECSEND <False> will abort a FEC broadcast.
+	cmdFSKOnly       command = "FSKONLY"    // <TRUE|FALSE> If true, only FSK modulation are used for ARQ connections (ARDOPc only?)
 
 )
 
@@ -128,7 +129,7 @@ func parseCtrlMsg(str string) ctrlMsg {
 
 	switch msg.cmd {
 	// bool
-	case cmdCodec, cmdPTT, cmdBusy, cmdTwoToneTest, cmdCWID, cmdListen, cmdAutoBreak:
+	case cmdCodec, cmdPTT, cmdBusy, cmdTwoToneTest, cmdCWID, cmdListen, cmdAutoBreak, cmdFSKOnly:
 		msg.value = strings.ToLower(parts[1]) == "true"
 
 	// Undocumented

@@ -11,7 +11,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,6 +155,13 @@ func (tnc *TNC) init() (err error) {
 		return fmt.Errorf("Disable listen failed: %s", err)
 	}
 
+	// FSKONLY experiment
+	if t, _ := strconv.ParseBool(os.Getenv("ARDOP_FSKONLY_EXPERIMENT")); t {
+		if err = tnc.setFSKOnly(true); err != nil {
+			return fmt.Errorf("Set FSK only failed: %s", err)
+		}
+		log.Println("Experimental FSKONLY mode enabled")
+	}
 	return nil
 }
 
@@ -534,6 +543,13 @@ func (tnc *TNC) Heard() map[string]time.Time { return tnc.heard }
 // when needed. Users should normally don't do this.
 func (tnc *TNC) SetListenEnabled(listen bool) error {
 	return tnc.set(cmdListen, fmt.Sprintf("%t", listen))
+}
+
+// Enable/disable the FSKONLY mode.
+//
+// When enabled, the TNC will only use FSK modulation for ARQ connections.
+func (tnc *TNC) setFSKOnly(t bool) error {
+	return tnc.set(cmdFSKOnly, fmt.Sprintf("%t", t))
 }
 
 // Disconnect gracefully disconnects the active connection or cancels an ongoing connect.
