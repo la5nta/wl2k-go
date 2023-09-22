@@ -7,6 +7,7 @@ package catalog
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -27,11 +28,23 @@ type Course struct {
 	Magnetic bool
 }
 
+func NewCourse(degrees int, magnetic bool) (*Course, error) {
+	if degrees < 0 || degrees > 360 {
+		return nil, errors.New("degrees out of bounds [0,360]")
+	}
+	if degrees == 360 {
+		degrees = 0
+	}
+	c := Course{Magnetic: magnetic}
+	copy(c.Digits[:], []byte(fmt.Sprintf("%3d", degrees)))
+	return &c, nil
+}
+
 func (c Course) String() string {
 	if c.Magnetic {
-		return fmt.Sprintf("%sM", string(c.Digits[:3]))
+		return fmt.Sprintf("%sM", string(c.Digits[:]))
 	} else {
-		return fmt.Sprintf("%sT", string(c.Digits[:3]))
+		return fmt.Sprintf("%sT", string(c.Digits[:]))
 	}
 }
 

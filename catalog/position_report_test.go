@@ -41,6 +41,40 @@ func TestDecToDM(t *testing.T) {
 	}
 }
 
+func omitErr(v *Course, _ error) *Course { return v }
+
+func TestCourseStringer2(t *testing.T) {
+	// omitErr := func(c *Course, err error) *Course { return c }
+	tests := map[string]*Course{
+		"123T": omitErr(NewCourse(123, false)),
+		"123M": omitErr(NewCourse(123, true)),
+	}
+	for expect, in := range tests {
+		t.Run(expect, func(t *testing.T) {
+			if in == nil && expect != "" {
+				t.Fatal("got unexpected nil")
+			}
+			if got := in.String(); got != expect {
+				t.Errorf("Got %q, expected %q", got, expect)
+			}
+		})
+	}
+}
+
+func TestCourseStringer(t *testing.T) {
+	tests := map[string]Course{
+		"123T": {Digits: [3]byte{'1', '2', '3'}, Magnetic: false},
+		"123M": {Digits: [3]byte{'1', '2', '3'}, Magnetic: true},
+	}
+	for expect, in := range tests {
+		t.Run(expect, func(t *testing.T) {
+			if got := in.String(); got != expect {
+				t.Errorf("Got %q, expected %q", got, expect)
+			}
+		})
+	}
+}
+
 func ExamplePosReport_Message() {
 	lat := 60.18
 	lon := 5.3972
