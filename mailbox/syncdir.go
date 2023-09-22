@@ -227,12 +227,6 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 			continue
 		}
 
-		// Warn if we find a file that matches the old filename structure (TODO: Remove)
-		if isOldFilename(file.Name()) {
-			fmt.Fprintf(os.Stderr, "Mailbox: Ignoring message file with deprecated file name (%s). Fix manually by renaming the file to '%s'.\n", file.Name(), file.Name()+Ext)
-			continue
-		}
-
 		if !strings.EqualFold(filepath.Ext(file.Name()), Ext) {
 			continue
 		}
@@ -245,13 +239,6 @@ func LoadMessageDir(dirPath string) ([]*fbb.Message, error) {
 		msgs = append(msgs, msg)
 	}
 	return msgs, nil
-}
-
-func isOldFilename(str string) bool {
-	if len(str) > fbb.MaxMIDLength || filepath.Ext(str) != "" || strings.ContainsAny(str, "#~.") {
-		return false
-	}
-	return true
 }
 
 // OpenMessage opens a single a fbb.Message file.
