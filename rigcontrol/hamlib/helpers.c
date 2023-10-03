@@ -7,6 +7,8 @@
 
 #include <hamlib/rig.h>
 
+extern void rigListCb(const struct rig_caps *rc);
+
 void setBaudRate(RIG *r, int rate) {
 	r->state.rigport.parm.serial.rate = rate;
 }
