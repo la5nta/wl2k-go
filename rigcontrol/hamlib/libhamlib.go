@@ -80,7 +80,7 @@ func OpenSerial(model RigModel, path string, baudrate int) (*SerialRig, error) {
 	C.setBaudRate(rig, C.int(baudrate))
 
 	// Set path to tty
-	C.strncpy(&rig.state.rigport.pathname[0], C.CString(path), C.FILPATHLEN-1)
+	C.strncpy(&rig.state.rigport.pathname[0], C.CString(path), C.HAMLIB_FILPATHLEN-1)
 
 	err := codeToError(C.rig_open(rig))
 	if err != nil {
