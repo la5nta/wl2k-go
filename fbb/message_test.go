@@ -13,6 +13,38 @@ import (
 	"unicode"
 )
 
+func TestReadMessageWithWhitespaceBeforeHeader(t *testing.T) {
+	m1 := NewMessage(Private, "one-long-mid")
+	m1.AddTo("N0CALL")
+	m1.SetFrom("LA5NTA")
+	m1.SetBody("Hello world")
+
+	// Write the message with leading whitespace garbage
+	var buf bytes.Buffer
+	buf.WriteString("\r\n\r\n\t ")
+	if err := m1.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read the message and verify that we decoded the header successfully.
+	m2 := &Message{}
+	if err := m2.ReadFrom(bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(m1.Header, m2.Header) {
+		t.Error("parsed message header differs", m1, m2)
+	}
+}
+
+func TestEmptyMessageReadError(t *testing.T) {
+	if err := (&Message{}).ReadFrom(strings.NewReader("")); err == nil {
+		t.Errorf("Reading empty message did not error")
+	}
+	if err := (&Message{}).ReadFrom(strings.NewReader("\r\n\r\nfoobar")); err == nil {
+		t.Errorf("Reading headerless message did not error")
+	}
+}
+
 func TestParseDate(t *testing.T) {
 	tests := []string{
 		"2016/12/30 01:00", // The correct format according to winlink.org/b2f.

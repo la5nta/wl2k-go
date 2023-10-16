@@ -290,11 +290,33 @@ func (m *Message) Cc() (cc []Address) {
 	return
 }
 
+// copied from from stdlib's bytes/bytes.go
+var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
+
+// trimLeft advances the reader until the first byte not
+func trimLeftSpace(r *bufio.Reader) {
+	for {
+		b, err := r.Peek(1)
+		if err != nil || asciiSpace[b[0]] == 0 {
+			break
+		}
+		r.Discard(len(b))
+	}
+}
+
 // Implements ReaderFrom for Message.
 //
 // Reads the given io.Reader and fills in values fetched from the stream.
 func (m *Message) ReadFrom(r io.Reader) error {
 	reader := bufio.NewReader(r)
+
+	// Trim leading whitespace before reading the header:
+	// Got a mysterious bug that traced back to the possibility of a
+	// received message with leading CRLFs. Trimming space characters
+	// before reading the header should be safe, as the worst case scenario
+	// is that we fail to parse the header as opposed to definitely
+	// failing.
+	trimLeftSpace(reader)
 
 	if h, err := textproto.NewReader(reader).ReadMIMEHeader(); err != nil {
 		return err
