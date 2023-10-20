@@ -6,6 +6,8 @@
 // +build libhamlib
 
 #include <hamlib/rig.h>
+extern void rigListCb();
+
 
 extern void rigListCb(const struct rig_caps *rc);
 

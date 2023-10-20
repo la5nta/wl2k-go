@@ -58,7 +58,13 @@ func OpenTCP(addr string) (*TCPRig, error) {
 // Ping checks that a connection to rigctld is open and valid.
 //
 // If no connection is active, it will try to establish one.
-func (r *TCPRig) Ping() error { _, err := r.cmd(`dump_caps`); return err }
+//
+func (r *TCPRig) Ping() error {
+	_, err := r.cmd(`\get_info`, 1) // Every rig should return something, anything here.
+	return err
+}
+
+// func (r *TCPRig) Ping() error { _, err := r.cmd(`dump_caps`); return err }
 
 func (r *TCPRig) dial() (err error) {
 	r.mu.Lock()
@@ -79,7 +85,8 @@ func (r *TCPRig) dial() (err error) {
 	return err
 }
 
-// Closes the connection to the Rig.
+// Close closes the connection to the Rig.
+//
 func (r *TCPRig) Close() error {
 	if r.conn == nil {
 		return nil
@@ -87,10 +94,11 @@ func (r *TCPRig) Close() error {
 	return r.conn.Close()
 }
 
-// Returns the Rig's active VFO (for control).
+// CurrentVFO Returns the Rig's active VFO (for control).
+//
 func (r *TCPRig) CurrentVFO() VFO { return &tcpVFO{r, ""} }
 
-// Returns the Rig's VFO A (for control).
+// VFOA Returns the Rig's VFO A (for control).
 //
 // ErrNotVFOMode is returned if rigctld is not in VFO mode.
 func (r *TCPRig) VFOA() (VFO, error) {
@@ -103,7 +111,7 @@ func (r *TCPRig) VFOA() (VFO, error) {
 	return &tcpVFO{r, "VFOA"}, nil
 }
 
-// Returns the Rig's VFO B (for control).
+// VFOB Returns the Rig's VFO B (for control).
 //
 // ErrNotVFOMode is returned if rigctld is not in VFO mode.
 func (r *TCPRig) VFOB() (VFO, error) {
@@ -116,22 +124,25 @@ func (r *TCPRig) VFOB() (VFO, error) {
 	return &tcpVFO{r, "VFOB"}, nil
 }
 
+// VFOMode returns whether the rig is in VFO mode
+//
 func (r *TCPRig) VFOMode() (bool, error) {
-	resp, err := r.cmd(`\chk_vfo`)
+	resps, err := r.cmd(`\chk_vfo`, 1)
 	if err != nil {
 		return false, err
 	}
-	return resp == "CHKVFO 1", nil
+	return resps[0] == "CHKVFO 1", nil
 }
 
-// Gets the dial frequency for this VFO.
+// GetFreq Gets the dial frequency as an int in Hz for this VFO.
+//
 func (v *tcpVFO) GetFreq() (int, error) {
-	resp, err := v.cmd(`\get_freq`)
+	resps, err := v.cmd(`\get_freq`, 1)
 	if err != nil {
 		return -1, err
 	}
 
-	freq, err := strconv.Atoi(resp)
+	freq, err := strconv.Atoi(resps[0])
 	if err != nil {
 		return -1, err
 	}
@@ -139,20 +150,55 @@ func (v *tcpVFO) GetFreq() (int, error) {
 	return freq, nil
 }
 
-// Sets the dial frequency for this VFO.
+// SetFreq Sets the dial frequency in Hz for this VFO.
+//
 func (v *tcpVFO) SetFreq(freq int) error {
-	_, err := v.cmd(`\set_freq %d`, freq)
+	_, err := v.cmd(`\set_freq %d`, 0, freq)
+	return err
+}
+
+// GetMode returns the modulation mode and passband width (Hz) of this VFO.
+//
+func (v *tcpVFO) GetMode() (rigmode Mode, bandwidth int, err error) {
+	var modeBW []string
+	modeBW, err = v.cmd(`\get_mode`, 2)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	rigmode, err = StringToMode(modeBW[0])
+	if err != nil {
+		return 0, 0, err
+	}
+
+	bandwidth, err = strconv.Atoi(modeBW[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return rigmode, bandwidth, nil
+}
+
+// SetMode sets the rig to modulation mode 'rigmode' and passband bandwith 'bandwidth' (Hz)
+// If 'bandwidth' is zero then the rig's default passband width for that mode is selected.
+// If the given mode doesn't pertain to this rig an error is returned.
+//
+func (v *tcpVFO) SetMode(rigmode Mode, bandwidth int) (err error) {
+	smode := ModeToString(rigmode)
+
+	sbw := strconv.Itoa(bandwidth)
+
+	_, err = v.cmd(`\set_mode %s %s`, 0, smode, sbw)
 	return err
 }
 
 // GetPTT returns the PTT state for this VFO.
 func (v *tcpVFO) GetPTT() (bool, error) {
-	resp, err := v.cmd("t")
+	resps, err := v.cmd("t", 1)
 	if err != nil {
 		return false, err
 	}
 
-	switch resp {
+	switch resps[0] {
 	case "0":
 		return false, nil
 	case "1", "2", "3":
@@ -162,7 +208,8 @@ func (v *tcpVFO) GetPTT() (bool, error) {
 	}
 }
 
-// Enable (or disable) PTT on this VFO.
+// SetPTT Enable (or disable) PTT on this VFO.
+//
 func (v *tcpVFO) SetPTT(on bool) error {
 	bInt := 0
 	if on == true {
@@ -174,21 +221,33 @@ func (v *tcpVFO) SetPTT(on bool) error {
 		bInt = 3
 	}
 
-	_, err := v.cmd(`\set_ptt %d`, bInt)
+	_, err := v.cmd(`\set_ptt %d`, 0, bInt)
 	return err
 }
 
-func (v *tcpVFO) cmd(format string, args ...interface{}) (string, error) {
+// cmd sends a command to the VFO expecting 'nresults' results back
+// which are returned in an array of strings
+
+func (v *tcpVFO) cmd(format string, nresults int, args ...interface{}) ([]string, error) {
 	// Add VFO argument (if set)
 	if v.prefix != "" {
 		parts := strings.Split(format, " ")
 		parts = append([]string{parts[0], v.prefix}, parts[1:]...)
 		format = strings.Join(parts, " ")
 	}
-	return v.r.cmd(format, args...)
+	return v.r.cmd(format, nresults, args...)
 }
 
-func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error) {
+// // cmd sends a command to the VFO expecting just one result back.
+// // This here for backward compatibility.
+
+// func (v *tcpVFO) cmd(format string, args ...interface{}) (string, error) {
+// 	res, err := v.r.cmdMulti(format, 1, args...)
+// 	return res[0], err
+// }
+
+// cmd sends a command to the rig expecting 'nresults' results back in an array of strings.
+func (r *TCPRig) cmd(format string, nresults int, args ...interface{}) (resp []string, err error) {
 	// Retry
 	for i := 0; i < 3; i++ {
 		if r.conn == nil {
@@ -198,7 +257,7 @@ func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error
 			}
 		}
 
-		resp, err = r.doCmd(format, args...)
+		resp, err = r.doCmd(format, nresults, args...)
 		if err == nil {
 			break
 		}
@@ -211,47 +270,78 @@ func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error
 	return resp, err
 }
 
-func (r *TCPRig) doCmd(format string, args ...interface{}) (string, error) {
+// // cmd sends a command to the rig in 'format' expecting just one result back, as 'resp'
+// // This function is provided as a backward compatible interface to cmdMulti.
+
+// func (r *TCPRig) cmd(format string, args ...interface{}) (resp string, err error) {
+// 	resps, e := r.cmdMulti(format, 1, args)
+// 	return resps[0], e
+// }
+
+// doCmd Execute a hamlib command in 'string', expecting 'nresults' values returned, using 'args'
+// Returns a slice with the data in the order returned by the command, if any; if none then empty slice.
+//
+func (r *TCPRig) doCmd(format string, nresults int, args ...interface{}) (results []string, err error) {
+	// Execute a hamlib command in 'string', expecting 'nresults' values returned, using 'args'
+	// Returns a slice with the data in the order returned by the command, if any; if none then empty slice.
+
 	r.tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
 	id, err := r.conn.Cmd(format, args...)
 	r.tcpConn.SetDeadline(time.Time{})
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	r.conn.StartResponse(id)
 	defer r.conn.EndResponse(id)
 
 	r.tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
-	resp, err := r.conn.ReadLine()
+
+	// Using the hamlib regular protocol.
+	// Set commands return no data but 'RPRT 0' for success.
+	// 'RPRT -n' is an error, 'n' being a code.
+	// Get commands return the data, one value per line, or
+	// 'RPRT -n' signalling an error.
+	var resp string
+
+	if nresults == 0 { // i.e. a 'Set' command.
+		resp, err = r.conn.ReadLine()
+
+		// A set command returns 'RPRT 0' for success or 'RPRT -n' for failure code 'n'.
+		if err == nil {
+			if !strings.HasPrefix(resp, "RPRT 0") {
+				c := fmt.Sprintf(format, args...)
+				err = fmt.Errorf("Sent hamlib cmd \"%s\" but it returned error %s", c, resp)
+			}
+		}
+		// Drop out of here with err!=nil if there was a problem.
+
+	} else { // This is a Get command which will produce 'nresults' lines of output.
+		for i := 0; i < nresults; i++ {
+			resp, err = r.conn.ReadLine()
+			if err != nil {
+				break
+			} else if strings.HasPrefix(resp, "RPRT") {
+				// Some kind of failure. Get commands should not return RPRT 0
+				err = fmt.Errorf("Hamlib given %s but returned %s", format, resp)
+				break
+			}
+
+			results = append(results, resp)
+		}
+	}
+
 	r.tcpConn.SetDeadline(time.Time{})
 
 	if err != nil {
-		return "", err
-	} else if err := toError(resp); err != nil {
-		return resp, err
+		return nil, err
 	}
 
-	return resp, nil
-}
-
-func toError(str string) error {
-	if !strings.HasPrefix(str, "RPRT ") {
-		return nil
+	if nresults > 0 && len(results) != nresults {
+		return nil, fmt.Errorf("Hamlib command %s returned %d results; expected %d", format, len(results), nresults)
 	}
 
-	parts := strings.SplitN(str, " ", 2)
-
-	code, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return err
-	}
-
-	switch code {
-	case 0:
-		return nil
-	default:
-		return fmt.Errorf("code %d", code)
-	}
+	// ... and finally, all is good.
+	return results, nil
 }
