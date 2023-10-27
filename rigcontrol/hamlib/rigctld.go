@@ -121,7 +121,7 @@ func (r *TCPRig) VFOMode() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return resp == "CHKVFO 1", nil
+	return strings.TrimPrefix(resp, "CHKVFO ") == "1", nil
 }
 
 // Gets the dial frequency for this VFO.
