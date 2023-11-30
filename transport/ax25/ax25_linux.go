@@ -34,8 +34,10 @@ var numAXPorts int
 
 // bug(martinhpedersen): The AX.25 stack does not support SOCK_STREAM, so any write to the connection
 // that is larger than maximum packet length will fail. The b2f impl. requires 125 bytes long packets.
-var ErrMessageTooLong = errors.New("Write: Message too long. Consider increasing maximum packet length to >= 125.")
-var ErrPortNotExist = errors.New("No such AX port found")
+var (
+	ErrMessageTooLong = errors.New("Write: Message too long. Consider increasing maximum packet length to >= 125.")
+	ErrPortNotExist   = errors.New("No such AX port found")
+)
 
 type fd uintptr
 
@@ -71,7 +73,7 @@ func checkPort(axPort string) error {
 		return err
 	}
 	if !portExists(axPort) {
-		return ErrPortNotExist
+		return fmt.Errorf("%w: %s", ErrPortNotExist, axPort)
 	}
 	return nil
 }
