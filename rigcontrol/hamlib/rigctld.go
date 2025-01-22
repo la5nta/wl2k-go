@@ -165,13 +165,11 @@ func (v *tcpVFO) GetPTT() (bool, error) {
 // Enable (or disable) PTT on this VFO.
 func (v *tcpVFO) SetPTT(on bool) error {
 	bInt := 0
-	if on == true {
+	if on {
 		bInt = 1
-	}
-
-	// Experimental PTT STATE 3 (https://github.com/la5nta/pat/issues/184)
-	if experimentalPTT3Enabled() {
-		bInt = 3
+		if experimentalPTT3Enabled {
+			bInt = 3
+		}
 	}
 
 	_, err := v.cmd(`\set_ptt %d`, bInt)
