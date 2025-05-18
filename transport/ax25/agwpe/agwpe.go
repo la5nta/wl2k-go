@@ -48,7 +48,7 @@ func (t *TNC) run() {
 }
 
 func OpenTCP(addr string) (*TNC, error) {
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil, err
 	}
