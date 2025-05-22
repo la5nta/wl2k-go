@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -161,6 +162,24 @@ func (s *Session) sendHandshake(writer io.Writer, secureChallenge string) error 
 	}
 
 	return w.Flush()
+}
+
+func parsePM(str string) (PendingMessage, error) {
+	str = strings.TrimPrefix(str, ";PM: ")
+
+	// TO MID SIZE FROM SUBJECT
+	parts := strings.SplitN(str, " ", 5)
+	if len(parts) != 5 {
+		return PendingMessage{}, fmt.Errorf("Unexpected number of fields (%d): %q", len(parts), str)
+	}
+	parseInt := func(str string) int { n, _ := strconv.Atoi(str); return n }
+	return PendingMessage{
+		To:      AddressFromString(parts[0]),
+		MID:     parts[1],
+		Size:    parseInt(parts[2]),
+		From:    AddressFromString(parts[3]),
+		Subject: parts[4],
+	}, nil
 }
 
 func parseFW(line string) ([]Address, error) {

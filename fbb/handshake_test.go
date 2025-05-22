@@ -29,6 +29,27 @@ func TestParseFW(t *testing.T) {
 	}
 }
 
+func TestParsePM(t *testing.T) {
+	tests := map[string]PendingMessage{
+		";PM: LA5NTA FOOBARBAZ 869 SERVICE@winlink.org Your new Winlink Account": {
+			MID:     "FOOBARBAZ",
+			To:      AddressFromString("LA5NTA"),
+			From:    AddressFromString("SERVICE@winlink.org"),
+			Subject: "Your new Winlink Account",
+			Size:    869,
+		},
+	}
+
+	for input, expected := range tests {
+		got, err := parsePM(input)
+		if err != nil {
+			t.Errorf("Got unexpected error while parsing '%s': %s", input, err)
+		} else if !reflect.DeepEqual(got, expected) {
+			t.Errorf("Expected %v, got %v", expected, got)
+		}
+	}
+}
+
 func TestIsLoginFailure(t *testing.T) {
 	tests := map[error]bool{
 		fmt.Errorf("[1] Secure login failed - account password does not match. - Disconnecting (88.90.2.192)"): true,

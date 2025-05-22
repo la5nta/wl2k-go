@@ -205,6 +205,14 @@ Loop:
 			return
 		}
 
+		// Store pending message details (winlink extension)
+		if strings.HasPrefix(line, ";PM") {
+			if pm, err := parsePM(line); err == nil {
+				s.pendingMessages[pm.MID] = pm
+			}
+			continue
+		}
+
 		// Ignore comments and empty lines
 		if line == "" || line[0] == ';' {
 			continue
@@ -226,6 +234,9 @@ Loop:
 			if err = parseProposal(line, prop); err != nil {
 				err = fmt.Errorf("Unable to parse proposal: %w", err)
 				return
+			}
+			if pm, ok := s.pendingMessages[prop.mid]; ok {
+				prop.pendingMessage = &pm
 			}
 			proposals = append(proposals, prop)
 
@@ -302,11 +313,11 @@ Loop:
 // If we ever want to support requests of message with offset, we must guard against asking for
 // offsets > 999999. RMS Express does not do this (in Winmor P2P anyway), we must avoid that pitfall.
 func (s *Session) writeProposalsAnswer(rw io.ReadWriter, proposals []*Proposal) (nAccepted int, err error) {
-	answers := make([]byte, len(proposals))
 
 	seen := make(map[string]bool)
 
-	for i, prop := range proposals {
+	var unanswered []int
+	for idx, prop := range proposals {
 		if seen[prop.MID()] {
 			// Radio Only gateways will sometimes send multiple proposals for the same MID in the same batch.
 			// Instead of rejecting them right away, let's defer the dups until we know we have sucessfully received at least one of the copies.
@@ -318,15 +329,39 @@ func (s *Session) writeProposalsAnswer(rw io.ReadWriter, proposals []*Proposal) 
 		} else if s.h == nil {
 			s.log.Printf("Defering %s (missing handler)", prop.MID())
 			prop.answer = Defer
-		} else if prop.answer = s.h.GetInboundAnswer(*prop); prop.answer == Accept {
-			s.log.Printf("Accepting %s", prop.MID()) //TODO: Remove?
-			nAccepted++
+		} else {
+			unanswered = append(unanswered, idx)
 		}
 
 		seen[prop.MID()] = true
-		answers[i] = byte(prop.answer)
 	}
 
+	// Now call the inbound handler to get answers for the remaining in this block.
+	if batched, ok := s.h.(BatchedInboundHandler); ok {
+		check := make([]Proposal, 0, len(unanswered))
+		for _, idx := range unanswered {
+			check = append(check, *proposals[idx])
+		}
+		answers := batched.GetInboundAnswers(check)
+		for answerIdx, unansweredIdx := range unanswered {
+			p := proposals[unansweredIdx]
+			p.answer = answers[answerIdx]
+		}
+	} else {
+		for _, idx := range unanswered {
+			p := proposals[idx]
+			p.answer = s.h.GetInboundAnswer(*p)
+		}
+	}
+
+	answers := make([]byte, len(proposals))
+	for i, prop := range proposals {
+		answers[i] = byte(prop.answer)
+		if prop.answer == Accept {
+			s.log.Printf("Accepting %s", prop.MID())
+			nAccepted++
+		}
+	}
 	_, err = fmt.Fprintf(rw, "FS %s\r", answers)
 	return
 }

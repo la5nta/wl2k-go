@@ -72,6 +72,12 @@ type InboundHandler interface {
 	GetInboundAnswer(p Proposal) ProposalAnswer
 }
 
+// BatchedInboundHandler is an InboundHandler that prefers to answer inbound proposals in blocks.
+type BatchedInboundHandler interface {
+	InboundHandler
+	GetInboundAnswers([]Proposal) []ProposalAnswer
+}
+
 // Session represents a B2F exchange session.
 //
 // A session should only be used once.
@@ -94,6 +100,9 @@ type Session struct {
 	remoteFW  []Address // Addresses the remote requests messages on behalf of
 	localFW   []Address // Addresses we request messages on behalf of
 
+	// Map from MID to Pending Message details (;PM winlink extension)
+	pendingMessages map[string]PendingMessage
+
 	trafficStats TrafficStats
 
 	quitReceived bool
@@ -105,6 +114,13 @@ type Session struct {
 	log  *log.Logger
 	pLog *log.Logger
 	ua   UserAgent
+}
+
+type PendingMessage struct {
+	MID      string
+	To, From Address
+	Subject  string
+	Size     int
 }
 
 // Struct used to hold information that is reported during B2F handshake.
@@ -148,14 +164,15 @@ func NewSession(mycall, targetcall, locator string, h MBoxHandler) *Session {
 	mycall, targetcall = strings.ToUpper(mycall), strings.ToUpper(targetcall)
 
 	return &Session{
-		mycall:     mycall,
-		localFW:    []Address{AddressFromString(mycall)},
-		targetcall: targetcall,
-		log:        StdLogger,
-		h:          h,
-		pLog:       StdLogger,
-		ua:         StdUA,
-		locator:    locator,
+		mycall:          mycall,
+		localFW:         []Address{AddressFromString(mycall)},
+		pendingMessages: make(map[string]PendingMessage),
+		targetcall:      targetcall,
+		log:             StdLogger,
+		h:               h,
+		pLog:            StdLogger,
+		ua:              StdUA,
+		locator:         locator,
 		trafficStats: TrafficStats{
 			Received: make([]string, 0),
 			Sent:     make([]string, 0),

@@ -47,6 +47,9 @@ type Proposal struct {
 	size           int
 	compressedData []byte
 	compressedSize int
+
+	// Optional extra information for pending messages (winlink extension)
+	pendingMessage *PendingMessage
 }
 
 // Constructor for a new Proposal given a Winlink Message.
@@ -105,9 +108,20 @@ func (p *Proposal) MID() string {
 	return p.mid
 }
 
+// CompressedSize returns the size of the compressed message.
+func (p *Proposal) CompressedSize() int { return p.compressedSize }
+
+// Size returns the size of the uncompressed message.
+func (p *Proposal) Size() int { return p.size }
+
 // Returns the title of this proposal
 func (p *Proposal) Title() string {
 	return p.title
+}
+
+// Returns PM (Pending Message) information if available.
+func (p *Proposal) PendingMessage() *PendingMessage {
+	return p.pendingMessage
 }
 
 func (p *Proposal) Message() (*Message, error) {
