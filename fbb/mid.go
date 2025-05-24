@@ -20,5 +20,5 @@ func GenerateMid(callsign string) string {
 }
 
 func midPayload(callsign string, t time.Time) []byte {
-	return []byte(fmt.Sprintf("%s-%s", time.Now(), callsign))
+	return []byte(fmt.Sprintf("%s-%s", t, callsign))
 }
