@@ -142,6 +142,12 @@ func (s *Session) sendOutbound(rw io.ReadWriter, outbound []*Proposal) (sent map
 			return sent, err
 		case strings.HasPrefix(line, "FS "):
 			reply = line // The expected proposal answer
+		case strings.HasPrefix(line, ";PM"):
+			// Store pending message details (winlink extension)
+			if pm, err := parsePM(line); err == nil {
+				s.pendingMessages[pm.MID] = pm
+			}
+			continue
 		case strings.HasPrefix(line, ";"):
 			continue // Ignore comment
 		default:
