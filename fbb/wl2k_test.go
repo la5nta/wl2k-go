@@ -7,6 +7,7 @@ package fbb
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -122,7 +123,7 @@ func TestSessionCMS(t *testing.T) {
 	}
 }
 
-func TestSessionCMDWithMessage(t *testing.T) {
+func TestSessionCMSWithMessage(t *testing.T) {
 	client, srv := net.Pipe()
 
 	cerrs := make(chan error)
@@ -160,11 +161,18 @@ func TestSessionCMDWithMessage(t *testing.T) {
 	if propAnswer != "FS =\r" {
 		t.Errorf("Expected 'FS =', got '%s'", propAnswer)
 	}
-	fmt.Fprintf(srv, "FF\r") // No more messages
 
-	if line, _ := rd.ReadString('\r'); line != "FQ\r" {
-		t.Errorf("Expected 'FQ', got '%s'", line)
-	}
+	// CMS deviates from protocol at this point, as the specification says to
+	// turn the session over to the remote. But instead, CMS sends FQ and
+	// terminates the connection if it has no more pending messages.
+	//
+	// If it has another proposal block, the turnover is honored and it await
+	// it's turn.
+	go func() {
+		go io.Copy(io.Discard, rd)
+		fmt.Fprintf(srv, "FQ\r")
+		srv.Close() // ... But CMS instead terminates the connection.
+	}()
 
 	if err := <-cerrs; err != nil {
 		t.Errorf("Session exchange returned error: %s", err)
@@ -214,12 +222,12 @@ func TestSessionCMSv4(t *testing.T) {
 		t.Errorf("Expected 'FS =', got '%s'", propAnswer)
 	}
 
-	fmt.Fprintf(srv, ";WARNING: Foo bar baz\r") // One more CMS v4 ; line
-	fmt.Fprintf(srv, "FF\r")                    // No more messages
-
-	if line, _ := rd.ReadString('\r'); line != "FQ\r" {
-		t.Errorf("Expected 'FQ', got '%s'", line)
+	if line, _ := rd.ReadString('\r'); line != "FF\r" {
+		t.Errorf(`Expected "FF\r", got %q`, line)
 	}
+
+	fmt.Fprintf(srv, ";WARNING: Foo bar baz\r") // One more CMS v4 ; line
+	fmt.Fprintf(srv, "FQ\r")                    // No more messages
 
 	if err := <-cerrs; err != nil {
 		t.Errorf("Session exchange returned error: %s", err)

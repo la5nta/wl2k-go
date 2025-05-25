@@ -53,11 +53,12 @@ const (
 )
 
 func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
+	outbound := s.outbound()
 	var sent map[string]bool
 
 	// Send outbound messages
-	if len(s.outbound()) > 0 {
-		sent, err = s.sendOutbound(rw)
+	if len(outbound) > 0 {
+		sent, err = s.sendOutbound(rw, outbound)
 		if err != nil {
 			return
 		}
@@ -71,14 +72,9 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 		}
 	}
 
-	// If all messages was deferred/rejected, we should propose new messages
-	if len(sent) == 0 && len(s.outbound()) > 0 {
-		return s.handleOutbound(rw)
-	}
-
-	// Handle session turnover
+	// Handle session turnover (regardless of number of accepted messages)
 	switch {
-	case len(sent) > 0:
+	case len(outbound) > 0:
 		// Turnover is implied
 	case s.remoteNoMsgs && len(sent) == 0:
 		s.pLog.Print(">FQ")
@@ -118,11 +114,10 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 	return
 }
 
-func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err error) {
+func (s *Session) sendOutbound(rw io.ReadWriter, outbound []*Proposal) (sent map[string]bool, err error) {
 	sent = make(map[string]bool) // Use this to keep track of sent (rejected or not) mids.
 	var checksum int64
 
-	outbound := s.outbound()
 	if len(outbound) > MaxBlockSize {
 		outbound = outbound[0:MaxBlockSize]
 	}
@@ -145,7 +140,7 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 	}
 	checksum = (-checksum) & 0xff
 
-	s.log.Printf(`Sending checksum %02X`, checksum)
+	s.pLog.Printf(">F> %02X", checksum)
 	fmt.Fprintf(rw, "F> %02X\r", checksum)
 
 	var reply string
@@ -159,7 +154,7 @@ func (s *Session) sendOutbound(rw io.ReadWriter) (sent map[string]bool, err erro
 		case strings.HasPrefix(line, ";"):
 			continue // Ignore comment
 		default:
-			return sent, fmt.Errorf("Expected proposal answer from remote. Got: '%s'", reply)
+			return sent, fmt.Errorf("Expected proposal answer from remote. Got: %q", reply)
 		}
 	}
 
@@ -241,6 +236,7 @@ Loop:
 			proposals = append(proposals, prop)
 
 		case "FF": // No more messages
+			s.remoteNoMsgs = true
 			break Loop
 
 		case "FQ": // Quit
@@ -258,22 +254,20 @@ Loop:
 
 			// If we didn't get any proposals, return
 			if len(proposals) == 0 {
+				s.remoteNoMsgs = true
 				return
 			}
 
+			s.remoteNoMsgs = false
+
 			// Answer proposal
 			s.log.Printf(`%d proposal(s) received`, len(proposals))
-			nAccepted, err = s.writeProposalsAnswer(rw, proposals)
+			_, err = s.writeProposalsAnswer(rw, proposals)
 			if err != nil {
 				return quitReceived, err
 			}
 
-			if nAccepted > 0 {
-				break Loop // Session turn over is implied after receiving the messages
-			}
-
-			// Continue receiving proposals if all where rejected/deferred
-			return s.handleInbound(rw)
+			break Loop // Session turn over is implied (regardless of number of accepted messages)
 		default: //TODO: Ignore?
 			return false, fmt.Errorf("Unknown protocol command %c", line[1])
 		}
@@ -284,12 +278,10 @@ Loop:
 	}
 
 	// Fetch and decompress accepted
-	s.remoteNoMsgs = true
 	for _, prop := range proposals {
 		if prop.answer != Accept {
 			continue
 		}
-		s.remoteNoMsgs = false
 
 		var msg *Message
 		if err = s.readCompressed(rw, prop); err != nil {
@@ -362,6 +354,7 @@ func (s *Session) writeProposalsAnswer(rw io.ReadWriter, proposals []*Proposal) 
 			nAccepted++
 		}
 	}
+	s.pLog.Printf(">FS %s", answers)
 	_, err = fmt.Fprintf(rw, "FS %s\r", answers)
 	return
 }

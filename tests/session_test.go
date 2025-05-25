@@ -2,6 +2,7 @@ package tests
 
 import (
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"testing"
@@ -40,9 +41,10 @@ func (s *Station) ListenTelnet() (string, <-chan error, error) {
 		defer conn.Close()
 
 		conn.SetDeadline(time.Now().Add(time.Minute))
-		s := fbb.NewSession(s.Callsign, conn.(*telnet.Conn).RemoteCall(), "", s.MBox)
-		s.IsMaster(true)
-		if _, err := s.Exchange(conn); err != nil {
+		session := fbb.NewSession(s.Callsign, conn.(*telnet.Conn).RemoteCall(), "", s.MBox)
+		session.SetLogger(log.New(os.Stderr, s.Callsign+": ", 0))
+		session.IsMaster(true)
+		if _, err := session.Exchange(conn); err != nil {
 			errors <- err
 			return
 		}
@@ -99,6 +101,7 @@ func TestMultiBlockAllDeferred(t *testing.T) {
 
 	conn.SetDeadline(time.Now().Add(time.Minute))
 	s := fbb.NewSession(bob.Callsign, bob.Callsign, "", bob.MBox)
+	s.SetLogger(log.New(os.Stderr, bob.Callsign+": ", 0))
 	if _, err := s.Exchange(conn); err != nil {
 		t.Fatalf("Exchange failed at connecting node: %s", err)
 	}
@@ -113,8 +116,8 @@ func TestMultiBlockAllDeferred(t *testing.T) {
 		t.Fatalf("Test timeout!")
 	}
 
-	if alice.MBox.OutboxCount() != 0 {
-		t.Errorf("Unexpected QTC in %s's mailbox. Expected 0.", alice.Callsign)
+	if n := alice.MBox.OutboxCount(); n != 0 {
+		t.Errorf("Unexpected QTC in %s's mailbox. Expected 0, got %d.", alice.Callsign, n)
 	}
 }
 
