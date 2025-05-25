@@ -54,14 +54,21 @@ const (
 
 func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 	outbound := s.outbound()
-	var sent map[string]bool
+	if len(outbound) == 0 {
+		// There are no outbound messages. Send FF or FQ.
+		resp := "FF"
+		if s.remoteNoMsgs {
+			resp = "FQ"
+		}
+		s.pLog.Printf(">%s", resp)
+		fmt.Fprintf(rw, "%s\r", resp)
+		return s.remoteNoMsgs, nil
+	}
 
 	// Send outbound messages
-	if len(outbound) > 0 {
-		sent, err = s.sendOutbound(rw, outbound)
-		if err != nil {
-			return
-		}
+	sent, err := s.sendOutbound(rw, outbound)
+	if err != nil {
+		return false, err
 	}
 
 	// Report rejected now, they can safely be omitted even if an error occures
@@ -72,36 +79,19 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 		}
 	}
 
-	// Handle session turnover (regardless of number of accepted messages)
-	switch {
-	case len(outbound) > 0:
-		// Turnover is implied
-	case s.remoteNoMsgs && len(sent) == 0:
-		s.pLog.Print(">FQ")
-		fmt.Fprint(rw, "FQ\r")
-		quitSent = true
-		return // No need to check for remote error since we did not send any messages
-	default:
-		s.pLog.Print(">FF")
-		fmt.Fprint(rw, "FF\r")
-	}
-
 	// Error reporting from remote is not defined by the protocol,
 	// but usually indicated by sending a line prefixed with '***'.
 	// The only valid bytes (according to protocol) after a session
 	// turnover is 'F' or ';', so we use those to confirm the block
 	// was successfully received.
-	var p []byte
-	if p, err = s.rd.Peek(1); err != nil {
-		return
+	if p, err := s.rd.Peek(1); err != nil {
+		return false, err
 	} else if p[0] != 'F' && p[0] != ';' {
-		var line string
-		line, err = s.nextLine()
+		line, err := s.nextLine()
 		if err != nil {
-			return
+			return false, err
 		}
-		err = fmt.Errorf("Unexpected response: '%s'", line)
-		return
+		return false, fmt.Errorf("Unexpected response: '%s'", line)
 	}
 
 	// Report successfully sent messages
@@ -111,6 +101,7 @@ func (s *Session) handleOutbound(rw io.ReadWriter) (quitSent bool, err error) {
 			s.trafficStats.Sent = append(s.trafficStats.Sent, mid)
 		}
 	}
+
 	return
 }
 
