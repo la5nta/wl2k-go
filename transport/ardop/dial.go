@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/la5nta/wl2k-go/transport"
 )
@@ -78,6 +79,13 @@ func (tnc *TNC) DialBandwidth(targetcall string, bw Bandwidth) (net.Conn, error)
 		defers = append(defers, func() error { return tnc.SetARQBandwidth(currentBw) })
 	}
 
+	// Handle busy channel with BusyFunc if provided.
+	if tnc.busyFunc != nil {
+		if abort := tnc.waitIfBusy(tnc.busyFunc); abort {
+			return nil, fmt.Errorf("aborted while waiting for clear channel")
+		}
+	}
+
 	if err := tnc.arqCall(targetcall, 10); err != nil {
 		for _, fn := range defers {
 			_ = fn()
@@ -106,4 +114,24 @@ func (tnc *TNC) DialBandwidth(targetcall string, bw Bandwidth) (net.Conn, error)
 	}
 
 	return tnc.data, nil
+}
+
+// waitIfBusy waits for signal from the BusyFunc if the channel is busy.
+func (tnc *TNC) waitIfBusy(busyFunc BusyFunc) (abort bool) {
+	if !tnc.Busy() {
+		return false
+	}
+
+	// Start a goroutine to cancel the context if/when the channel clears
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		for tnc.Busy() && ctx.Err() == nil {
+			time.Sleep(300 * time.Millisecond)
+		}
+	}()
+
+	// Block until busyFunc returns
+	return busyFunc(ctx)
 }

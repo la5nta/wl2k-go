@@ -6,6 +6,7 @@ package ardop
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +39,8 @@ type TNC struct {
 
 	selfClose bool
 
-	ptt transport.PTTController
+	ptt      transport.PTTController
+	busyFunc BusyFunc
 
 	// CRC checksum of frames and frame type prefixes is not used over TCPIP
 	isTCP bool
@@ -375,6 +377,16 @@ func (tnc *TNC) close() {
 	// no need for a finalizer anymore
 	runtime.SetFinalizer(tnc, nil)
 }
+
+// BusyFunc is a function that is called when the dialed channel is busy.
+//
+// If the channel is busy, the dialer blocks on this function call until it returns.
+// The provided context is cancelled if/when the channel clears.
+// The return value determines if the dialer should abort or continue dialing.
+type BusyFunc func(context.Context) (abort bool)
+
+// SetBusyFunc sets the function that will be called if the channel is busy when dialing.
+func (tnc *TNC) SetBusyFunc(fn BusyFunc) { tnc.busyFunc = fn }
 
 // Returns true if channel is not clear
 func (tnc *TNC) Busy() bool {
