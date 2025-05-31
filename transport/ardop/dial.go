@@ -8,26 +8,43 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/la5nta/wl2k-go/transport"
 )
 
+// The default number of connect requests when dialing.
+const DefaultConnectRequests = 10
+
 // DialURL dials ardop:// URLs.
 //
-// Parameter bw can be used to set the ARQ bandwidth for this connection. See DialBandwidth for details.
+// Accepted query parameters:
+//   - bw: The ARQ bandwidth for this connection.
+//   - connect_requests: The number of connect frames to send before giving up (default: 10).
 func (tnc *TNC) DialURL(url *transport.URL) (net.Conn, error) {
 	if url.Scheme != "ardop" {
 		return nil, transport.ErrUnsupportedScheme
 	}
-	bwStr := url.Params.Get("bw")
-	if bwStr == "" {
-		return tnc.Dial(url.Target)
+
+	var bw Bandwidth
+	if str := url.Params.Get("bw"); str != "" {
+		var err error
+		bw, err = BandwidthFromString(str)
+		if err != nil {
+			return nil, err
+		}
 	}
-	bw, err := BandwidthFromString(bwStr)
-	if err != nil {
-		return nil, err
+
+	var connectRequests int
+	if str := url.Params.Get("connect_requests"); str != "" {
+		var err error
+		connectRequests, err = strconv.Atoi(url.Params.Get("connect_requests"))
+		if err != nil {
+			return nil, fmt.Errorf("invalid connect_requests value: %w", err)
+		}
 	}
-	return tnc.DialBandwidth(url.Target, bw)
+
+	return tnc.DialBandwidth(url.Target, bw, connectRequests)
 }
 
 // DialURLContext dials ardop:// URLs with cancellation support. See DialURL.
@@ -53,17 +70,21 @@ func (tnc *TNC) DialURLContext(ctx context.Context, url *transport.URL) (net.Con
 	}
 }
 
-// Dial dials a ARQ connection.
+// Dial dials a ARQ connection with default bandwidth and connect requests.
 func (tnc *TNC) Dial(targetcall string) (net.Conn, error) {
-	return tnc.DialBandwidth(targetcall, Bandwidth{})
+	return tnc.DialBandwidth(targetcall, Bandwidth{}, DefaultConnectRequests)
 }
 
 // DialBandwidth dials a ARQ connection after setting the given ARQ bandwidth temporarily.
 //
 // The ARQ bandwidth setting is reverted on any Dial error and when calling conn.Close().
-func (tnc *TNC) DialBandwidth(targetcall string, bw Bandwidth) (net.Conn, error) {
+func (tnc *TNC) DialBandwidth(targetcall string, bw Bandwidth, connectRequests int) (net.Conn, error) {
 	if tnc.closed {
 		return nil, ErrTNCClosed
+	}
+
+	if connectRequests == 0 {
+		connectRequests = DefaultConnectRequests
 	}
 
 	var defers []func() error
@@ -78,7 +99,7 @@ func (tnc *TNC) DialBandwidth(targetcall string, bw Bandwidth) (net.Conn, error)
 		defers = append(defers, func() error { return tnc.SetARQBandwidth(currentBw) })
 	}
 
-	if err := tnc.arqCall(targetcall, 10); err != nil {
+	if err := tnc.arqCall(targetcall, connectRequests); err != nil {
 		for _, fn := range defers {
 			_ = fn()
 		}
