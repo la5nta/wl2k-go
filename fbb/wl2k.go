@@ -126,7 +126,6 @@ type PendingMessage struct {
 // Struct used to hold information that is reported during B2F handshake.
 //
 // Non of the fields must contain a dash (-).
-//
 type UserAgent struct {
 	Name    string
 	Version string
@@ -332,7 +331,7 @@ func remoteErr(str string) error {
 		return nil
 	}
 
-	return fmt.Errorf(strings.TrimSpace(str[idx+1:]))
+	return errors.New(strings.TrimSpace(str[idx+1:]))
 }
 
 // Mycall returns this stations call sign.

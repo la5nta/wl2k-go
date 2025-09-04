@@ -6,7 +6,7 @@ package fbb
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 )
@@ -70,7 +70,7 @@ func errLine(str string) error {
 		return nil
 	}
 
-	return fmt.Errorf(strings.TrimSpace(str[idx+1:]))
+	return errors.New(strings.TrimSpace(str[idx+1:]))
 }
 
 func cleanString(str string) string {

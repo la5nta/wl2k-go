@@ -623,7 +623,7 @@ func (tnc *TNC) arqCall(targetcall string, repeat int) error {
 	for msg := range r.Msgs() {
 		switch msg.cmd {
 		case cmdFault:
-			return fmt.Errorf(msg.String())
+			return errors.New(msg.String())
 		case cmdNewState:
 			if tnc.state == Disconnected {
 				return ErrConnectTimeout
