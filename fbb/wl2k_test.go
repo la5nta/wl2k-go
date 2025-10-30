@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"strings"
 	"testing"
 )
@@ -37,42 +36,6 @@ func TestSessionP2P(t *testing.T) {
 		s := NewSession("N0CALL", "LA5NTA", "JO39EQ", nil)
 		s.IsMaster(true)
 		_, err := s.Exchange(master)
-		masterErr <- err
-	}()
-
-	if err := <-masterErr; err != nil {
-		t.Errorf("Master returned with error: %s", err)
-	}
-	if err := <-clientErr; err != nil {
-		t.Errorf("Client returned with error: %s", err)
-	}
-}
-
-func TestFWAuxOnlyExperiment(t *testing.T) {
-	os.Setenv("FW_AUX_ONLY_EXPERIMENT", "1")
-	defer os.Setenv("FW_AUX_ONLY_EXPERIMENT", "0")
-
-	client, master := net.Pipe()
-
-	clientErr := make(chan error)
-	go func() {
-		s := NewSession("LA5NTA", "N0CALL", "JO39EQ", nil)
-		s.AddAuxiliaryAddress(AddressFromString("EMCOMM-1@winlink.org"))
-		_, err := s.Exchange(client)
-		clientErr <- err
-	}()
-
-	masterErr := make(chan error)
-	go func() {
-		s := NewSession("N0CALL", "LA5NTA", "JO39EQ", nil)
-		s.IsMaster(true)
-		_, err := s.Exchange(master)
-		switch fw := s.RemoteForwarders(); {
-		case len(fw) != 1:
-			t.Errorf("unexpected FW count: %d", len(fw))
-		case fw[0].String() != "EMCOMM-1":
-			t.Errorf("unexpected FW address: %q", fw[0])
-		}
 		masterErr <- err
 	}()
 

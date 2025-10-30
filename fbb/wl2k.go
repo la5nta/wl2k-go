@@ -16,7 +16,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -229,13 +228,6 @@ func (s *Session) RemoteSID() string { return string(s.remoteSID) }
 func (s *Session) Exchange(conn net.Conn) (stats TrafficStats, err error) {
 	if s.Done() {
 		return stats, nil
-	}
-
-	// Experimental support for fetching messages only for auxiliary addresses (not mycall).
-	// Ref https://groups.google.com/g/pat-users/c/5G1JIEyFXe4
-	if t, _ := strconv.ParseBool(os.Getenv("FW_AUX_ONLY_EXPERIMENT")); t && len(s.localFW) > 1 {
-		s.localFW = s.localFW[1:]
-		s.log.Printf("FW_AUX_ONLY_EXPERIMENT: Requesting messages for %v", s.localFW)
 	}
 
 	// The given conn should always be closed after returning from this method.
