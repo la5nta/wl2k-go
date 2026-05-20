@@ -73,12 +73,6 @@ func (f *frame) ReadFrom(r io.Reader) (int64, error) {
 	} else {
 		f.Data = f.Data[:f.header.DataLen]
 	}
-	m, err := r.Read(f.Data)
-	switch {
-	case err != nil:
-		return n + int64(m), err
-	case m != len(f.Data):
-		return n + int64(m), io.ErrUnexpectedEOF
-	}
+	m, err := io.ReadFull(r, f.Data)
 	return n + int64(m), err
 }

@@ -64,6 +64,32 @@ func TestFrameRoundtrip(t *testing.T) {
 	}
 }
 
+func TestFrameBuildersSetPort(t *testing.T) {
+	var port uint8 = 3
+	from, to := "N0CALL", "N0ONE"
+
+	frames := map[string]frame{
+		"connectFrame":              connectFrame(from, to, port, nil),
+		"connectViaFrame":           connectFrame(from, to, port, []string{"DIGI1"}),
+		"disconnectFrame":           disconnectFrame(from, to, port),
+		"unregisterCallsignFrame":   unregisterCallsignFrame(from, port),
+		"unprotoInformationFrame":   unprotoInformationFrame(from, to, port, []byte("test")),
+		"registerCallsignFrame":     registerCallsignFrame(from, port),
+		"portCapabilitiesFrame":     portCapabilitiesFrame(port),
+		"connectedDataFrame":        connectedDataFrame(port, from, to, []byte("test")),
+		"outstandingFramesForPort":  outstandingFramesForPortFrame(port),
+		"outstandingFramesForConn":  outstandingFramesForConnFrame(port, from, to),
+	}
+
+	for name, f := range frames {
+		t.Run(name, func(t *testing.T) {
+			if f.header.Port != port {
+				t.Errorf("got Port=%d, want %d", f.header.Port, port)
+			}
+		})
+	}
+}
+
 func TestFrameDecode(t *testing.T) {
 	raw := []byte{
 		0x01, 0x00, 0x00, 0x00, 0x4D, 0x00, 0xCF, 0x00, 0x4C, 0x55, 0x37, 0x44, 0x49, 0x44, 0x2D, 0x34,
