@@ -86,7 +86,7 @@ func registerCallsignFrame(callsign string, port uint8) frame {
 }
 
 func unregisterCallsignFrame(callsign string, port uint8) frame {
-	h := header{DataKind: kindUnregister}
+	h := header{DataKind: kindUnregister, Port: port}
 	copy(h.From[:], callsign)
 	return frame{header: h}
 }
@@ -96,6 +96,7 @@ func connectFrame(from, to string, port uint8, digis []string) frame {
 		return connectViaFrame(from, to, port, digis)
 	}
 	return frame{header: header{
+		Port:     port,
 		DataKind: kindConnect,
 		From:     callsignFromString(from),
 		To:       callsignFromString(to),
@@ -104,6 +105,7 @@ func connectFrame(from, to string, port uint8, digis []string) frame {
 
 func connectViaFrame(from, to string, port uint8, digis []string) frame {
 	h := header{
+		Port:     port,
 		DataKind: kindConnectVia,
 		From:     callsignFromString(from),
 		To:       callsignFromString(to),
@@ -119,7 +121,9 @@ func connectViaFrame(from, to string, port uint8, digis []string) frame {
 
 func unprotoInformationFrame(from, to string, port uint8, data []byte) frame {
 	h := header{
+		Port:     port,
 		DataKind: kindUnprotoInformation,
+		PID:      0xf0,
 		From:     callsignFromString(from),
 		To:       callsignFromString(to),
 	}
@@ -127,7 +131,7 @@ func unprotoInformationFrame(from, to string, port uint8, data []byte) frame {
 }
 
 func disconnectFrame(from, to string, port uint8) frame {
-	h := header{DataKind: kindDisconnect}
+	h := header{DataKind: kindDisconnect, Port: port}
 	copy(h.From[:], from)
 	copy(h.To[:], to)
 	return frame{header: h}
