@@ -74,9 +74,11 @@ func ParseURL(rawurl string) (*URL, error) {
 	}
 
 	// TODO: This should be up to the specific transport to decide.
-	digisUnsupported := url.Scheme == "ardop" || url.Scheme == "telnet"
-	if len(url.Digis) > 0 && digisUnsupported {
-		return url, ErrDigisUnsupported
+	switch url.Scheme {
+	case "ardop", "telnet", "mercury":
+		if len(url.Digis) > 0 {
+			return url, ErrDigisUnsupported
+		}
 	}
 
 	return url, nil

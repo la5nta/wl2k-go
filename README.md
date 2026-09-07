@@ -84,6 +84,9 @@ For detailed package documentation, see <http://godoc.org/github.com/la5nta/wl2k
 #### ardop
 A driver for the ARDOP_WIN and ARDOPc TNCs. Provides dialing and listen capabilities over ARDOP (Amateur Radio Digital Open Protocol).
 
+#### mercury
+A driver for the [Mercury](https://github.com/Rhizomatica/mercury) HF modem, an open-source OFDM modem that exposes a VARA-compatible TCP TNC interface (a CR-terminated ASCII command port plus a raw data port on the next port number). Provides dialing and listen capabilities. Adapted from [Pat-Vara](https://github.com/n8jja/Pat-Vara) (MIT licensed) with the VARA-only behaviour removed.
+
 ## mailbox: Directory based MBoxHandler implementation
 
 For detailed package documentation, see <http://godoc.org/github.com/la5nta/wl2k-go/mailbox>.
