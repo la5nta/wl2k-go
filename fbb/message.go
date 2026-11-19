@@ -364,25 +364,20 @@ func (m *Message) ReadFrom(r io.Reader) error {
 }
 
 func readSection(reader *bufio.Reader, readN int) ([]byte, error) {
-	buf := make([]byte, readN)
-
-	var err error
-	n := 0
-	for n < readN {
-		m, err := reader.Read(buf[n:])
-		if err != nil {
-			break
-		}
-		n += m
+	if readN < 0 {
+		return nil, fmt.Errorf("Invalid section size %d", readN)
 	}
 
+	// Read through a limit rather than allocating readN up front, since the
+	// size comes from the message header.
+	buf, err := io.ReadAll(io.LimitReader(reader, int64(readN)))
 	if err != nil {
 		return buf, err
 	}
 
 	end, err := reader.ReadString('\n')
 	switch {
-	case n != readN:
+	case len(buf) != readN:
 		return buf, io.ErrUnexpectedEOF
 	case err == io.EOF:
 		// That's ok
