@@ -148,7 +148,7 @@ func (h *DirHandler) GetOutbound(fws ...fbb.Address) []*fbb.Message {
 		if len(fws) > 0 {
 			for _, fw := range fws {
 				if m.IsOnlyReceiver(fw) {
-					deliver = append(deliver, m)
+					deliver = append(deliver, withoutPrivateHeaders(m))
 					break
 				}
 			}
@@ -159,14 +159,18 @@ func (h *DirHandler) GetOutbound(fws ...fbb.Address) []*fbb.Message {
 			continue // The message is P2POnly and remote is CMS
 		}
 
-		// Remove private headers
-		m.Header.Del("X-P2POnly")
-		m.Header.Del("X-FilePath")
-		m.Header.Del("X-Unread")
-
-		deliver = append(deliver, m)
+		deliver = append(deliver, withoutPrivateHeaders(m))
 	}
 	return deliver
+}
+
+// withoutPrivateHeaders removes the headers the mailbox keeps for itself,
+// such as the message's local file path, so they are never sent.
+func withoutPrivateHeaders(m *fbb.Message) *fbb.Message {
+	m.Header.Del("X-P2POnly")
+	m.Header.Del("X-FilePath")
+	m.Header.Del("X-Unread")
+	return m
 }
 
 // Deprecated: implementers should choose their own directories
