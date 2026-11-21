@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 var testdataPath = "testdata/"
@@ -479,4 +480,40 @@ So, I ask the Winlink 2000 developers: Why not move to bzip2 compression?  It’
 		[]byte{},
 		[]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	},
+}
+
+// A corrupted stream must end in an error, never make Read return (0, nil) forever.
+func TestCorruptStreamEnds(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(testdataPath, "gettysburg.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	w := NewB2Writer(&buf)
+	w.Write(data)
+	w.Close()
+	orig := buf.Bytes()
+
+	for i := 6; i < len(orig); i++ {
+		corrupt := append([]byte(nil), orig...)
+		corrupt[i] ^= 0x55
+		done := make(chan error, 1)
+		go func() {
+			lz, err := NewB2Reader(bytes.NewReader(corrupt))
+			if err != nil {
+				done <- err
+				return
+			}
+			io.Copy(io.Discard, lz)
+			done <- lz.Close()
+		}()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Errorf("byte %d flipped: decoded without error", i)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("byte %d flipped: decoder never finished", i)
+		}
+	}
 }

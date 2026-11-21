@@ -106,7 +106,7 @@ func (d *Reader) Read(p []byte) (n int, err error) {
 		d.err = io.ErrUnexpectedEOF
 	case d.r.Err() != nil:
 		d.err = d.r.Err()
-	case d.state.pos == d.header.size && d.state.buf.Len() == 0:
+	case d.state.pos >= d.header.size && d.state.buf.Len() == 0: // >= since a corrupt stream can overshoot
 		return 0, io.EOF
 	}
 
