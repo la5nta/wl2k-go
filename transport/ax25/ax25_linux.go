@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -45,6 +46,9 @@ type ax25Listener struct {
 	sock      fd
 	localAddr AX25Addr
 	close     chan struct{}
+
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func portExists(port string) bool { return C.ax25_config_get_dev(C.CString(port)) != nil }
@@ -79,15 +83,23 @@ func checkPort(axPort string) error {
 }
 
 // Addr returns the listener's network address, an AX25Addr.
-func (ln ax25Listener) Addr() net.Addr { return ln.localAddr }
+func (ln *ax25Listener) Addr() net.Addr { return ln.localAddr }
 
 // Close stops listening on the AX.25 port. Already Accepted connections are not closed.
-func (ln ax25Listener) Close() error { close(ln.close); return ln.sock.close() }
+//
+// It is safe to call Close multiple times.
+func (ln *ax25Listener) Close() error {
+	ln.closeOnce.Do(func() {
+		close(ln.close)
+		ln.closeErr = ln.sock.close()
+	})
+	return ln.closeErr
+}
 
 // Accept waits for the next call and returns a generic Conn.
 //
 // See net.Listener for more information.
-func (ln ax25Listener) Accept() (net.Conn, error) {
+func (ln *ax25Listener) Accept() (net.Conn, error) {
 	err := ln.sock.waitRead(ln.close)
 	if err != nil {
 		return nil, err
@@ -136,7 +148,7 @@ func ListenAX25(axPort, mycall string) (net.Listener, error) {
 		return nil, err
 	}
 
-	return ax25Listener{
+	return &ax25Listener{
 		sock:      fd(socket),
 		localAddr: AX25Addr{localAddr},
 		close:     make(chan struct{}),
