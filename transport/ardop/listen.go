@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
 type listener struct {
@@ -15,9 +16,11 @@ type listener struct {
 	quit     chan struct{}
 	errors   <-chan error
 	addr     Addr
+
+	closeOnce sync.Once
 }
 
-func (l listener) Accept() (c net.Conn, err error) {
+func (l *listener) Accept() (c net.Conn, err error) {
 	select {
 	case c, ok := <-l.incoming:
 		if !ok {
@@ -29,12 +32,13 @@ func (l listener) Accept() (c net.Conn, err error) {
 	}
 }
 
-func (l listener) Addr() net.Addr {
+func (l *listener) Addr() net.Addr {
 	return l.addr
 }
 
-func (l listener) Close() error {
-	close(l.quit)
+// Close is safe to call multiple times.
+func (l *listener) Close() error {
+	l.closeOnce.Do(func() { close(l.quit) })
 	return nil
 }
 
@@ -114,5 +118,5 @@ func (tnc *TNC) Listen() (ln net.Listener, err error) {
 		}
 	}()
 
-	return listener{incoming, quit, errors, Addr{mycall}}, nil
+	return &listener{incoming: incoming, quit: quit, errors: errors, addr: Addr{mycall}}, nil
 }

@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/la5nta/wl2k-go/transport"
@@ -48,6 +49,7 @@ type TNC struct {
 	connected      bool
 	listenerActive bool
 	closed         bool
+	closeOnce      sync.Once
 
 	beacon *beacon
 }
@@ -342,6 +344,8 @@ func (tnc *TNC) Ping() error {
 }
 
 // Closes the connection to the TNC (and any on-going connections).
+//
+// It is safe to call Close multiple times.
 func (tnc *TNC) Close() error {
 	if tnc.closed {
 		return nil
@@ -360,22 +364,21 @@ func (tnc *TNC) Close() error {
 }
 
 func (tnc *TNC) close() {
-	if tnc.closed {
-		return
-	}
-	tnc.closed = true // bug(martinhpedersen): Data race in tnc.Close can cause panic on duplicate calls
+	tnc.closeOnce.Do(func() {
+		tnc.closed = true
 
-	tnc.beacon.Close()
-	tnc.eof()
+		tnc.beacon.Close()
+		tnc.eof()
 
-	tnc.ctrl.Close()
+		tnc.ctrl.Close()
 
-	tnc.in.Close() // TODO: This may panic due to the race mentioned above. Consider using a mutex to guard tnc.closed.
-	close(tnc.out)
-	close(tnc.dataOut)
+		tnc.in.Close()
+		close(tnc.out)
+		close(tnc.dataOut)
 
-	// no need for a finalizer anymore
-	runtime.SetFinalizer(tnc, nil)
+		// no need for a finalizer anymore
+		runtime.SetFinalizer(tnc, nil)
+	})
 }
 
 // BusyFunc is a function that is called when the dialed channel is busy.
