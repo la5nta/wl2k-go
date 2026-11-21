@@ -163,3 +163,12 @@ func IsIllegalHeader(str string) bool {
 func IsGraphicASCII(c rune) bool {
 	return c <= unicode.MaxASCII && unicode.IsGraphic(c)
 }
+
+func TestReadMessageWithBadBodySize(t *testing.T) {
+	for _, size := range []string{"-1", "2000000000"} {
+		raw := "Mid: ABC123\r\nBody: " + size + "\r\nFrom: N0AAA\r\nTo: N0BBB\r\nSubject: x\r\n\r\nshort body\r\n"
+		if err := new(Message).ReadFrom(strings.NewReader(raw)); err == nil {
+			t.Errorf("Body: %s: read without error", size)
+		}
+	}
+}
